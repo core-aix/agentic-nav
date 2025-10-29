@@ -8,4 +8,4 @@ Download https://neurips.cc/static/virtual/data/neurips-2025-orals-posters.json 
 
 Run `uv run build_json_rag.py` to build the vector database for RAG. 
 
-Then run using `uv run main.py`.
+Then run using `uv run main_ui.py`.

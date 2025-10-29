@@ -25,7 +25,7 @@ def _snippet(text: str, max_chars: int = 240) -> str:
     text = " ".join(text.split())
     return text if len(text) <= max_chars else text[:max_chars-1] + "…"
 
-def search_paper_titles_and_abstracts(keywords_to_search: str, num_records: int = 20) -> Dict[str, Any]:
+def search_papers(keywords_to_search: str, num_records: int = 20) -> Dict[str, Any]:
     """
     Search most relevant papers over title+abstract. The number of records returned can be controlled via `num_records`.
     Returns JSON with 'keywords_to_search' and 'results' (the results include metadata of the paper).
@@ -38,11 +38,11 @@ def search_paper_titles_and_abstracts(keywords_to_search: str, num_records: int 
     if len(keywords_to_search) == 0 or num_records <= 0:
         return {"query": keywords_to_search, "results": []}
 
-    start_time = time.time()
+    # start_time = time.time()
     qv = _embed_query(keywords_to_search)
     scores, idxs = _FAISS.search(qv, num_records)
     scores, idxs = scores[0].tolist(), idxs[0].tolist()
-    print(f"Search for '{keywords_to_search}' took {time.time() - start_time:.3f}s")
+    # print(f"Search for '{keywords_to_search}' took {time.time() - start_time:.3f}s")
 
     results = []
     for score, i in zip(scores, idxs):

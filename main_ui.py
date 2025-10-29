@@ -1,0 +1,185 @@
+import os
+import shutil
+import sys
+import tempfile
+import json
+import datetime
+from rich.console import Console
+from rich.markdown import Markdown
+
+"""
+Lightweight terminal chat UI that interacts with an agent implementation.
+
+Contract with main.py:
+- main.py should export a function with this signature:
+    def agent_respond(messages: list[dict]) -> dict:
+        # messages is a list of {"role": "system|user|assistant", "content": str}
+        # returns a single assistant message dict: {"role": "assistant", "content": str}
+- If your main.py uses a different API, adapt the import below or provide a thin shim.
+
+Features:
+- Renders assistant messages as Markdown (uses rich if available, falls back to plain text).
+- Multi-line input via $EDITOR using the "/edit" command.
+- Commands: /help, /exit, /system, /edit, /history, /save <path>
+"""
+
+
+# Try to import agent_respond from main.py
+try:
+    from agent_neurips_2025 import agent_respond, msgs  # main.py should define this
+except Exception as e:
+    def agent_respond(messages):
+        raise RuntimeError(
+            "Could not import agent_respond from main.py. "
+            "Please implement def agent_respond(messages: list[dict]) -> dict in main.py"
+        )
+
+console = Console(soft_wrap=True)
+def render_markdown(text):
+    console.print(Markdown(text))
+
+PROMPT = "You> "
+
+def open_editor(initial_text=""):
+    editor = os.environ.get("EDITOR")
+    if not editor:
+        # Minimal sensible defaults
+        if os.name == "nt":
+            editor = "notepad"
+        else:
+            editor = "nano"
+    with tempfile.NamedTemporaryFile(suffix=".md", delete=False, mode="w+", encoding="utf-8") as tf:
+        path = tf.name
+        tf.write(initial_text)
+        tf.flush()
+    try:
+        # Open editor and wait
+        rc = os.system(f'{editor} "{path}"')
+        if rc != 0:
+            print(f"(editor exit code {rc})")
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+    finally:
+        try:
+            os.unlink(path)
+        except Exception:
+            pass
+    return content.strip()
+
+def print_help():
+    help_text = """
+Commands:
+  /help           Show this help
+  /exit           Exit the chat
+  /system         Set or replace system prompt (multi-line via $EDITOR)
+  /edit           Compose multi-line user message via $EDITOR
+  /history        Show conversation history (JSON)
+  /save <path>    Save conversation history to a file (JSON)
+Typing anything else will send it as a user message.
+"""
+    print(help_text)
+
+def show_history(messages):
+    for i, m in enumerate(messages):
+        ts = m.get("_ts", "")
+        role = m.get("role", "")
+        content = m.get("content", "")
+        header = f"[{i}] {role} {ts}"
+        print(header)
+        print("-" * len(header))
+        print(content)
+        print()
+
+def save_history(messages, path):
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(messages, f, indent=2, ensure_ascii=False)
+        print(f"Saved to {path}")
+    except Exception as e:
+        print("Save failed:", e)
+
+def main():
+    messages = msgs.copy()
+    # Optionally seed with a system message; leave empty by default
+    # messages.append({"role": "system", "content": "You are a helpful assistant.", "_ts": str(datetime.utcnow())})
+    print("Lightweight Chat UI. Type /help for commands.")
+    while True:
+        try:
+            line = input(PROMPT).strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+
+        if not line:
+            continue
+
+        if line.startswith("/"):
+            parts = line.split(maxsplit=1)
+            cmd = parts[0].lower()
+            arg = parts[1] if len(parts) > 1 else ""
+            if cmd == "/help":
+                print_help()
+            elif cmd == "/exit":
+                print("Goodbye.")
+                break
+            elif cmd == "/edit":
+                content = open_editor()
+                if content:
+                    msg = {"role": "user", "content": content, "_ts": str(datetime.datetime.now(datetime.UTC))}
+                    messages.append(msg)
+                else:
+                    print("(no content)")
+                    continue
+            elif cmd == "/system":
+                content = open_editor()
+                if content:
+                    # Replace or append system message as first element
+                    sys_msg = {"role": "system", "content": content, "_ts": str(datetime.datetime.now(datetime.UTC))}
+                    # Remove existing system messages
+                    messages = [m for m in messages if m.get("role") != "system"]
+                    messages.insert(0, sys_msg)
+                    print("System prompt set.")
+                else:
+                    print("(no content)")
+                    continue
+            elif cmd == "/history":
+                show_history(messages)
+                continue
+            elif cmd == "/save":
+                path = arg.strip() or "chat_history.json"
+                save_history(messages, path)
+                continue
+            else:
+                print("Unknown command. Type /help.")
+                continue
+        else:
+            # Regular single-line user message
+            msg = {"role": "user", "content": line, "_ts": str(datetime.datetime.now(datetime.UTC))}
+            messages.append(msg)
+
+        # Call the agent
+        try:
+            # Provide agent_respond with a copy without timestamps
+            msgs_for_agent = [{"role": m["role"], "content": m["content"]} for m in messages]
+            assistant_msg = agent_respond(msgs_for_agent)
+            if not assistant_msg or assistant_msg.get("role") != "assistant":
+                raise RuntimeError("agent_respond must return a dict like {'role':'assistant', 'content': '...'}")
+            assistant_msg["_ts"] = str(datetime.datetime.now(datetime.UTC))
+            messages.append(assistant_msg)
+
+            # Render assistant message as Markdown
+            if console:
+                render_markdown(assistant_msg["content"])
+            else:
+                print("\nAssistant (Markdown):\n")
+                render_markdown(assistant_msg["content"])
+                print()
+        except KeyboardInterrupt:
+            print("\n(interrupted)")
+            continue
+        except Exception as e:
+            print("Error from agent:", e)
+            # keep going
+
+if __name__ == "__main__":
+    main()

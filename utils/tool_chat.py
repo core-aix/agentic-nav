@@ -4,6 +4,10 @@ from dataclasses import dataclass, field
 import json, inspect
 from litellm import completion
 import sys
+from rich.console import Console
+from rich.live import Live
+from rich.text import Text
+
 
 # ---- Minimal auto-schema from function signature ----
 def _json_type(t: Any) -> Dict[str, Any]:
@@ -45,84 +49,90 @@ class ToolChat:
     # model: str = "ollama_chat/ibm/granite4:350m"
     model: str = "ollama_chat/gpt-oss:20b"
     api_base: str = "http://localhost:11434"
-    default_params: Dict[str, Any] = field(default_factory=lambda: {"temperature": 0.2, "max_tokens": 6000})
+    # api_base: str = "http://localhost:11435"
+    default_params: Dict[str, Any] = field(default_factory=lambda: {"temperature": 0.2, "max_tokens": 6000, "num_ctx": 131072})
 
-    def tool_loop(self, messages: List[Dict[str, Any]], tool_funcs: List[Callable[..., Any]], max_rounds: int = 3) -> Dict[str, Any]:
+    def tool_loop(self, messages: List[Dict[str, Any]], tool_funcs: List[Callable[..., Any]], max_rounds: int = 10) -> Dict[str, Any]:
         registry = {fn.__name__: fn for fn in tool_funcs}
         tools = [infer_tool(fn) for fn in registry.values()]
         msgs = list(messages)
-        for _ in range(max_rounds):
-            stream_iter = completion(
-                model=self.model,
-                messages=msgs,
-                tools=tools,
-                tool_choice="auto",
-                api_base=self.api_base,
-                stream=True,
-                **self.default_params,
-            )
 
-            collected = ""
-            calls = []
-            # try:
-            for chunk in stream_iter:
-                choices = chunk.get("choices", []) or []
-                if not choices:
-                    continue
-                choice = choices[0]
+        console = Console()
 
-                # try several places where partial content may appear
-                content = None
-                delta = choice.get("delta")
+        with console.screen():
+            console.print("\n[bold green]Assistant is working...[/bold green]\n")
+            
+            for _ in range(max_rounds):
+                stream_iter = completion(
+                    model=self.model,
+                    messages=msgs,
+                    tools=tools,
+                    tool_choice="auto",
+                    api_base=self.api_base,
+                    stream=True,
+                    **self.default_params,
+                )
 
-                if "content" in delta:
-                    content = delta["content"]
-                elif "message" in delta and isinstance(delta["message"], dict):
-                    content = delta["message"].get("content")
+                collected = ""
+                calls = []
 
-                if "tool_calls" in delta:
-                    calls.extend(delta["tool_calls"] or [])
-                
-                if content is None:
-                    msg = choice.get("message")
-                    if isinstance(msg, dict):
-                        content = msg.get("content")
+                for chunk in stream_iter:
+                    choices = chunk.get("choices", []) or []
+                    if not choices:
+                        continue
+                    choice = choices[0]
 
-                if content is None:
-                    content = choice.get("text")
+                    # try several places where partial content may appear
+                    content = None
+                    delta = choice.get("delta")
 
-                if content:
-                    if not isinstance(content, str):
-                        try:
-                            content = json.dumps(content, ensure_ascii=False)
-                        except Exception:
-                            content = str(content)
-                    sys.stdout.write(content)
-                    sys.stdout.flush()
+                    if "content" in delta:
+                        content = delta["content"]
+                    elif "message" in delta and isinstance(delta["message"], dict):
+                        content = delta["message"].get("content")
 
-                    collected += content
-            # append the assembled assistant message so tool execution sees the assistant's follow-up
-            msgs.append({"role": "assistant", "content": collected})
-            print("\n", flush=True)
+                    if "tool_calls" in delta:
+                        calls.extend(delta["tool_calls"] or [])
+                    
+                    if content is None:
+                        msg = choice.get("message")
+                        if isinstance(msg, dict):
+                            content = msg.get("content")
 
-            if not calls:
-                return msgs
-            else:
-                print("tool_calls:", calls, flush=True)
+                    if content is None:
+                        content = choice.get("text")
 
-            # execute tools and append results
-            for call in calls:
-                name = call["function"]["name"]
-                args = call["function"].get("arguments", "{}")
-                try:
-                    parsed = json.loads(args) if isinstance(args, str) else (args or {})
-                except json.JSONDecodeError:
-                    parsed = {}
-                out = registry[name](**parsed)
-                msgs.append({
-                    "role": "tool",
-                    "tool_call_id": call.get("id"),
-                    "name": name,
-                    "content": json.dumps(out, ensure_ascii=False),
-                })
+                    if content:
+                        if not isinstance(content, str):
+                            try:
+                                content = json.dumps(content, ensure_ascii=False)
+                            except Exception:
+                                content = str(content)
+                        console.print(content, end="", style="cyan")
+
+                        collected += content
+                # append the assembled assistant message so tool execution sees the assistant's follow-up
+                msgs.append({"role": "assistant", "content": collected})
+
+                if not calls:
+                    return msgs
+                else:
+                    console.print(f"tool_calls: {calls}", style="cyan")
+
+                # execute tools and append results
+                for call in calls:
+                    name = call["function"]["name"]
+                    args = call["function"].get("arguments", "{}")
+                    try:
+                        parsed = json.loads(args) if isinstance(args, str) else (args or {})
+                    except json.JSONDecodeError:
+                        parsed = {}
+                    out = registry[name](**parsed)
+                    msgs.append({
+                        "role": "tool",
+                        "tool_call_id": call.get("id"),
+                        "name": name,
+                        "content": json.dumps(out, ensure_ascii=False),
+                    })
+        
         return msgs
