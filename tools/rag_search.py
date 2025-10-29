@@ -25,19 +25,22 @@ def _snippet(text: str, max_chars: int = 240) -> str:
     text = " ".join(text.split())
     return text if len(text) <= max_chars else text[:max_chars-1] + "…"
 
-def search_papers(query: str, k: int = 10) -> Dict[str, Any]:
+def search_paper_titles_and_abstracts(query: str, num_records: int = 20) -> Dict[str, Any]:
     """
-    Search top-k relevant papers over title+abstract. You need to specify k as the total number of results that you would like to get.
+    Search most relevant papers over title+abstract. The number of records returned can be controlled via `num_records`.
     Returns JSON with 'query' and 'results' (the results include metadata of the paper).
     """
     try:
-        k = int(k)
+        num_records = int(num_records)
     except Exception:
-        k = 5
+        num_records = 20
     
+    if len(query) == 0 or num_records <= 0:
+        return {"query": query, "results": []}
+
     start_time = time.time()
     qv = _embed_query(query)
-    scores, idxs = _FAISS.search(qv, k)
+    scores, idxs = _FAISS.search(qv, num_records)
     scores, idxs = scores[0].tolist(), idxs[0].tolist()
     print(f"Search for '{query}' took {time.time() - start_time:.3f}s")
 
