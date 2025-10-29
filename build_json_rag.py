@@ -64,4 +64,4 @@ def build_index(json_path: str, out_dir: str = INDEX_DIR) -> None:
 
 if __name__ == "__main__":
     # build_index("data/papers_test.json")
-    build_index("data/neurips-2025-orals-posters-pretty.json")
+    build_index("data/neurips-2025-orals-posters.json")
