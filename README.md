@@ -1,6 +1,6 @@
 # llm-agents
 
-Install Ollama and pull `nomic-embed-text` and `llama3.1` models
+Install Ollama and pull `nomic-embed-text` and `gpt-oss:20b` models (gpt-oss seems to work the best based on experience form manual runs)
 
 ### Agent for NeurIPS 2025 papers
 

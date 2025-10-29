@@ -41,10 +41,11 @@ def infer_tool(func: Callable[..., Any]) -> Dict[str, Any]:
 class ToolChat:
     # model: str = "ollama_chat/phi4-mini"
     # model: str = "ollama_chat/qwen3"
-    model: str = "ollama_chat/llama3.1"
+    # model: str = "ollama_chat/llama3.1"
     # model: str = "ollama_chat/ibm/granite4:350m"
+    model: str = "ollama_chat/gpt-oss:20b"
     api_base: str = "http://localhost:11434"
-    default_params: Dict[str, Any] = field(default_factory=lambda: {"temperature": 0.2, "max_tokens": 2000})
+    default_params: Dict[str, Any] = field(default_factory=lambda: {"temperature": 0.2, "max_tokens": 6000})
 
     def tool_loop(self, messages: List[Dict[str, Any]], tool_funcs: List[Callable[..., Any]], max_rounds: int = 3) -> Dict[str, Any]:
         registry = {fn.__name__: fn for fn in tool_funcs}
