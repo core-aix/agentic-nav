@@ -53,16 +53,9 @@ def infer_tool(func: Callable[..., Any], tool_args: Dict[Any, Any]) -> Dict[str,
 # ---- LiteLLM chat wrapper with tool loop ----
 @dataclass
 class ToolChat:
-    # model: str = "ollama_chat/phi4-mini"
-    # model: str = "ollama_chat/qwen3"
-    # model: str = "ollama_chat/llama3.1"
-    # model: str = "ollama_chat/ibm/granite4:350m"
-    # model: str = "ollama_chat/gpt-oss:20b"
-    model: str = "ollama_chat/gpt-oss:120b-cloud"
-    # api_base: str = "http://localhost:11434"
-    # api_base: str = "http://localhost:11435"
-    api_base: str = "https://ollama.com"
-    api_key: str = os.environ.get("OLLAMA_API_KEY", None)
+    model: str
+    api_base: str
+    api_key: str
     default_params: Dict[str, Any] = field(default_factory=lambda: {"temperature": 0.2, "max_tokens": 6000, "num_ctx": 131072})
 
     def tool_loop(
@@ -78,6 +71,7 @@ class ToolChat:
 
         console = Console()
 
+        print(self.api_key)
         with console.screen():
             console.print("\n[bold green]Assistant is working...[/bold green]\n")
             

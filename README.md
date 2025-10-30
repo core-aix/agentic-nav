@@ -2,13 +2,17 @@
 
 
 ## Installation
-Install Ollama and pull `nomic-embed-text` and `gpt-oss:20b` models (gpt-oss seems to work the best based on experience form manual runs)
+Install Ollama and pull `nomic-embed-text` model for embedding computation used in RAG.
 ```commandline
 ollama pull nomic-embed-text
+```
+
+To use local model, also pull 
+```commandline
 ollama pull gpt-oss:20b
 ```
-The chat model can be configured to gpt-oss:120b-cloud. To use it, get an Ollama API key and write it into the environment variable `OLLAMA_API_KEY`.
-Call `ollama pull gpt-oss:120b-cloud` instead of `ollama pull gpt-oss:20b`.
+
+The chat model can be configured to use `gpt-oss:120b-cloud`. To use it, get an Ollama API key and pass it in the command line args (see below).
 
 
 
@@ -22,7 +26,9 @@ wget -O data/neurips-2025-orals-posters.json https://neurips.cc/static/virtual/d
 Run `uv run build_json_rag.py` to build the vector database for RAG. 
 
 ### Agent interaction
-Run the following command: 
+Run the following command.
+
+For local model:
 ```commandline
 uv run main_ui.py \
     -a http://localhost:11434 \
@@ -32,5 +38,18 @@ uv run main_ui.py \
     -c 131072 \
     --max-num-papers 10
 ```
+
+For Ollama cloud model:
+```commandline
+uv run main_ui.py \
+    -a https://ollama.com \
+    -k $OLLAMA_API_KEY \
+    -m ollama_chat/gpt-oss:120b-cloud \
+    -t 0.4 \
+    --max-tokens 6000 \
+    -c 131072 \
+    --max-num-papers 10
+```
+
 The backend uses LiteLLM, which allows you to use a variety of LLM inference endpoints. 
 Find details on the various providers [here](https://docs.litellm.ai/docs/providers).

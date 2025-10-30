@@ -11,6 +11,8 @@ API_BASE = "http://localhost:11434"
 EMBED_MODEL = "ollama/nomic-embed-text"
 INDEX_DIR = "rag_index_json"
 
+# TODO: Make this configurable
+
 # Load once at import (fast)
 _FAISS = faiss.read_index(str(Path(INDEX_DIR) / "faiss.index"))
 _META = json.loads(Path(INDEX_DIR, "meta.json").read_text())

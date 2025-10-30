@@ -30,11 +30,10 @@ Features:
 try:
     from agent_neurips_2025 import agent_respond, msgs  # main.py should define this
 except Exception as e:
-    def agent_respond(messages, model_name: str = None, api_base: str = None, llm_args: dict = None, tool_args: dict = None):
-        raise RuntimeError(
-            "Could not import agent_respond from main.py. "
-            "Please implement def agent_respond(messages: list[dict]) -> dict in main.py"
-        )
+    raise RuntimeError(
+        "Could not import agent_respond from main.py. "
+        "Please implement def agent_respond(messages: list[dict]) -> dict in main.py"
+    )
 
 console = Console(soft_wrap=True)
 def render_markdown(text):
@@ -101,13 +100,14 @@ def save_history(messages, path):
         print("Save failed:", e)
 
 @click.command()
-@click.option("-a", "--api-base", default="http://localhost:11435", type=str, help="Base URL to access the inference endpoint.")
+@click.option("-a", "--api-base", default="http://localhost:11434", type=str, help="Base URL to access the inference endpoint.")
+@click.option("-k", "--api-key", default=None, type=str, help="API key for authentication.")
 @click.option("-m", "--model", default="ollama_chat/gpt-oss:20b", type=str, help="Specify the model you want to use in LiteLLM format.")
 @click.option("-t", "--temperature", default=0.2, type=float, help="Specify the model temperature.")
 @click.option("--max-tokens", default=6000, type=int, help="Specify the max. number of model output tokens.")
 @click.option("-c", "--num-ctx", default=131072, type=int, help="Specify the model context window.")
 @click.option("-l", "--max-num-papers", default=50, type=int, help="Specify the maximum number of papers to retrieve.")
-def main(api_base, model, temperature, max_tokens, num_ctx, max_num_papers):
+def main(api_base, api_key, model, temperature, max_tokens, num_ctx, max_num_papers):
     messages = msgs.copy()
     # Optionally seed with a system message; leave empty by default
     # messages.append({"role": "system", "content": "You are a helpful assistant.", "_ts": str(datetime.utcnow())})
@@ -184,17 +184,14 @@ def main(api_base, model, temperature, max_tokens, num_ctx, max_num_papers):
         try:
             # Provide agent_respond with a copy without timestamps
             msgs_for_agent = [{"role": m["role"], "content": m["content"]} for m in messages]
-            assistant_msg = agent_respond(
+            updated_msgs = agent_respond(
                 msgs_for_agent,
                 model_name=model,
                 api_base=api_base,
+                api_key=api_key,
                 llm_args=llm_config,
                 tool_args=tool_args
             )
-            if not assistant_msg or assistant_msg.get("role") != "assistant":
-                raise RuntimeError("agent_respond must return a dict like {'role':'assistant', 'content': '...'}")
-            assistant_msg["_ts"] = str(datetime.datetime.now(datetime.UTC))
-            updated_msgs = agent_respond(msgs_for_agent).copy()
             for msg in updated_msgs:
                 if "_ts" not in msg and "role" in msg and msg.get("role") == "assistant":
                     msg["_ts"] = str(datetime.datetime.now(datetime.UTC))

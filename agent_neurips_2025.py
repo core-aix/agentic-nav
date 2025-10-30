@@ -12,13 +12,14 @@ msgs = [system]
 
 def agent_respond(
     messages,
-    model_name: str = "ollama_chat/gpt-oss:20b",
-    api_base: str = "http://localhost:11435",
+    model_name: str = None,
+    api_base: str = None,
+    api_key: str = None,
     llm_args: dict = {},
     tool_args: dict = {}
 ):
-    chat = ToolChat(model=model_name, api_base=api_base, default_params=llm_args)
-    return chat.tool_loop(messages, tool_funcs=[search_papers], tool_args=tool_args)[-1]
+    chat = ToolChat(model=model_name, api_base=api_base, api_key=api_key, default_params=llm_args)
+    return chat.tool_loop(messages, tool_funcs=[search_papers], tool_args=tool_args)
 
 # if __name__ == "__main__":
 #     chat = ToolChat()
