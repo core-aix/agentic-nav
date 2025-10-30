@@ -2,11 +2,14 @@ from __future__ import annotations
 from typing import Any, Dict, List, Callable, get_args, get_origin, Literal, Annotated, Union
 from dataclasses import dataclass, field
 import json, inspect
-from litellm import completion
-import sys
+import litellm
+import os
 from rich.console import Console
 from rich.live import Live
 from rich.text import Text
+
+
+# litellm._turn_on_debug()
 
 
 # ---- Minimal auto-schema from function signature ----
@@ -47,9 +50,12 @@ class ToolChat:
     # model: str = "ollama_chat/qwen3"
     # model: str = "ollama_chat/llama3.1"
     # model: str = "ollama_chat/ibm/granite4:350m"
-    model: str = "ollama_chat/gpt-oss:20b"
-    api_base: str = "http://localhost:11434"
+    # model: str = "ollama_chat/gpt-oss:20b"
+    model: str = "ollama_chat/gpt-oss:120b-cloud"
+    # api_base: str = "http://localhost:11434"
     # api_base: str = "http://localhost:11435"
+    api_base: str = "https://ollama.com"
+    api_key: str = os.environ.get("OLLAMA_API_KEY", None)
     default_params: Dict[str, Any] = field(default_factory=lambda: {"temperature": 0.2, "max_tokens": 6000, "num_ctx": 131072})
 
     def tool_loop(self, messages: List[Dict[str, Any]], tool_funcs: List[Callable[..., Any]], max_rounds: int = 10) -> Dict[str, Any]:
@@ -63,12 +69,13 @@ class ToolChat:
             console.print("\n[bold green]Assistant is working...[/bold green]\n")
             
             for _ in range(max_rounds):
-                stream_iter = completion(
+                stream_iter = litellm.completion(
                     model=self.model,
                     messages=msgs,
                     tools=tools,
                     tool_choice="auto",
                     api_base=self.api_base,
+                    api_key=self.api_key,
                     stream=True,
                     **self.default_params,
                 )
@@ -117,6 +124,14 @@ class ToolChat:
                 if not calls:
                     return msgs
                 else:
+                    # calls_tmp = []
+                    # for c in calls:
+                    #     c_tmp = dict(c)
+                    #     if "function" in c_tmp:
+                    #         c_tmp["function"] = dict(c_tmp["function"])
+                    #     calls_tmp.append(c_tmp)
+                    # msgs[-1]["tool_calls"] = calls_tmp
+                    msgs[-1]["tool_calls"] = calls
                     console.print(f"tool_calls: {calls}", style="cyan")
 
                 # execute tools and append results
