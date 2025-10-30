@@ -1,6 +1,8 @@
 # llm-agents
 
-Install Ollama and pull `nomic-embed-text` and `gpt-oss:20b` models (gpt-oss seems to work the best based on experience form manual runs)
+Install Ollama and pull `nomic-embed-text` model for embedding computation.
+
+The chat model is currently configured to gpt-oss:120b-cloud. To use it, get an Ollama API key and write it into the environment variable `OLLAMA_API_KEY`.
 
 ### Agent for NeurIPS 2025 papers
 
