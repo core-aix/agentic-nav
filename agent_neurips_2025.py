@@ -10,9 +10,15 @@ system = {"role": "system", "content": "You are an assistant who can help browsi
 
 msgs = [system]
 
-def agent_respond(messages):
-    chat = ToolChat()
-    return chat.tool_loop(messages, tool_funcs=[search_papers])
+def agent_respond(
+    messages,
+    model_name: str = "ollama_chat/gpt-oss:20b",
+    api_base: str = "http://localhost:11435",
+    llm_args: dict = {},
+    tool_args: dict = {}
+):
+    chat = ToolChat(model=model_name, api_base=api_base, default_params=llm_args)
+    return chat.tool_loop(messages, tool_funcs=[search_papers], tool_args=tool_args)[-1]
 
 # if __name__ == "__main__":
 #     chat = ToolChat()

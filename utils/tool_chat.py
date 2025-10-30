@@ -25,7 +25,7 @@ def _json_type(t: Any) -> Dict[str, Any]:
     if t in (bool,): return {"type": "boolean"}
     return {"type": "string"}
 
-def infer_tool(func: Callable[..., Any]) -> Dict[str, Any]:
+def infer_tool(func: Callable[..., Any], tool_args: Dict[Any, Any]) -> Dict[str, Any]:
     sig = inspect.signature(func)
     hints = getattr(func, "__annotations__", {})
     props, required = {}, []
@@ -34,6 +34,12 @@ def infer_tool(func: Callable[..., Any]) -> Dict[str, Any]:
         schema = _json_type(hints.get(name, str))
         if p.default is inspect._empty: required.append(name)
         props[name] = schema
+
+    parameter_values = {}
+    for arg_name, arg_val in tool_args.items():
+        if arg_name in props.keys():
+            parameter_values[arg_name] = arg_val
+
     return {
         "type": "function",
         "function": {
@@ -41,6 +47,7 @@ def infer_tool(func: Callable[..., Any]) -> Dict[str, Any]:
             "description": (inspect.getdoc(func) or f"Call {func.__name__}"),
             "parameters": {"type": "object", "properties": props, "required": required},
         },
+        "parameter_properties_values": parameter_values
     }
 
 # ---- LiteLLM chat wrapper with tool loop ----
@@ -58,9 +65,15 @@ class ToolChat:
     api_key: str = os.environ.get("OLLAMA_API_KEY", None)
     default_params: Dict[str, Any] = field(default_factory=lambda: {"temperature": 0.2, "max_tokens": 6000, "num_ctx": 131072})
 
-    def tool_loop(self, messages: List[Dict[str, Any]], tool_funcs: List[Callable[..., Any]], max_rounds: int = 10) -> Dict[str, Any]:
+    def tool_loop(
+        self,
+        messages: List[Dict[str, Any]],
+        tool_funcs: List[Callable[..., Any]],
+        tool_args: Dict[Any, Any],
+        max_rounds: int = 10
+    ) -> Dict[str, Any]:
         registry = {fn.__name__: fn for fn in tool_funcs}
-        tools = [infer_tool(fn) for fn in registry.values()]
+        tools = [infer_tool(fn, tool_args=tool_args) for fn in registry.values()]
         msgs = list(messages)
 
         console = Console()

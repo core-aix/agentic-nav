@@ -4,6 +4,8 @@ import sys
 import tempfile
 import json
 import datetime
+
+import click
 from rich.console import Console
 from rich.markdown import Markdown
 
@@ -28,7 +30,7 @@ Features:
 try:
     from agent_neurips_2025 import agent_respond, msgs  # main.py should define this
 except Exception as e:
-    def agent_respond(messages):
+    def agent_respond(messages, model_name: str = None, api_base: str = None, llm_args: dict = None, tool_args: dict = None):
         raise RuntimeError(
             "Could not import agent_respond from main.py. "
             "Please implement def agent_respond(messages: list[dict]) -> dict in main.py"
@@ -98,11 +100,31 @@ def save_history(messages, path):
     except Exception as e:
         print("Save failed:", e)
 
-def main():
+@click.command()
+@click.option("-a", "--api-base", default="http://localhost:11435", type=str, help="Base URL to access the inference endpoint.")
+@click.option("-m", "--model", default="ollama_chat/gpt-oss:20b", type=str, help="Specify the model you want to use in LiteLLM format.")
+@click.option("-t", "--temperature", default=0.2, type=float, help="Specify the model temperature.")
+@click.option("--max-tokens", default=6000, type=int, help="Specify the max. number of model output tokens.")
+@click.option("-c", "--num-ctx", default=131072, type=int, help="Specify the model context window.")
+@click.option("-l", "--max-num-papers", default=50, type=int, help="Specify the maximum number of papers to retrieve.")
+def main(api_base, model, temperature, max_tokens, num_ctx, max_num_papers):
     messages = msgs.copy()
     # Optionally seed with a system message; leave empty by default
     # messages.append({"role": "system", "content": "You are a helpful assistant.", "_ts": str(datetime.utcnow())})
     print("Lightweight Chat UI. Type /help for commands.")
+
+    # Config for the LLM messages
+    llm_config = {
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "num_ctx": num_ctx
+    }
+
+    # Parameters to limit the tool calling scope
+    tool_args = {
+        "num_records": max_num_papers
+    }
+
     while True:
         try:
             line = input(PROMPT).strip()
@@ -162,6 +184,16 @@ def main():
         try:
             # Provide agent_respond with a copy without timestamps
             msgs_for_agent = [{"role": m["role"], "content": m["content"]} for m in messages]
+            assistant_msg = agent_respond(
+                msgs_for_agent,
+                model_name=model,
+                api_base=api_base,
+                llm_args=llm_config,
+                tool_args=tool_args
+            )
+            if not assistant_msg or assistant_msg.get("role") != "assistant":
+                raise RuntimeError("agent_respond must return a dict like {'role':'assistant', 'content': '...'}")
+            assistant_msg["_ts"] = str(datetime.datetime.now(datetime.UTC))
             updated_msgs = agent_respond(msgs_for_agent).copy()
             for msg in updated_msgs:
                 if "_ts" not in msg and "role" in msg and msg.get("role") == "assistant":
