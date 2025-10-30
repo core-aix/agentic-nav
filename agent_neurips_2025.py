@@ -12,7 +12,7 @@ msgs = [system]
 
 def agent_respond(messages):
     chat = ToolChat()
-    return chat.tool_loop(messages, tool_funcs=[search_papers])[-1]
+    return chat.tool_loop(messages, tool_funcs=[search_papers])
 
 # if __name__ == "__main__":
 #     chat = ToolChat()

@@ -119,6 +119,7 @@ def main():
             arg = parts[1] if len(parts) > 1 else ""
             if cmd == "/help":
                 print_help()
+                continue
             elif cmd == "/exit":
                 print("Goodbye.")
                 break
@@ -161,10 +162,12 @@ def main():
         try:
             # Provide agent_respond with a copy without timestamps
             msgs_for_agent = [{"role": m["role"], "content": m["content"]} for m in messages]
-            assistant_msg = agent_respond(msgs_for_agent)
-            if not assistant_msg or assistant_msg.get("role") != "assistant":
-                raise RuntimeError("agent_respond must return a dict like {'role':'assistant', 'content': '...'}")
-            assistant_msg["_ts"] = str(datetime.datetime.now(datetime.UTC))
+            updated_msgs = agent_respond(msgs_for_agent).copy()
+            for msg in updated_msgs:
+                if "_ts" not in msg and "role" in msg and msg.get("role") == "assistant":
+                    msg["_ts"] = str(datetime.datetime.now(datetime.UTC))
+            # messages = updated_msgs  # TODO: Currently not using this due to issue with tool call mismatch error
+            assistant_msg = updated_msgs[-1]
             messages.append(assistant_msg)
 
             # Render assistant message as Markdown
