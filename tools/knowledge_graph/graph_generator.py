@@ -1,4 +1,6 @@
 import json
+
+import click
 import networkx as nx
 import numpy as np
 from typing import List, Dict, Any, Union
@@ -337,19 +339,32 @@ class PaperKnowledgeGraph:
         return stats
 
 
-# Test
-if __name__ == "__main__":
+@click.command()
+@click.option("-m", "--embedding-model", default="nomic-embed-text")
+@click.option("-l", "--ollama-server-url", default="http://localhost:11434")
+@click.option("-b", "--embedding-gen-batch-size", default=32)
+@click.option("-w", "--max-parallel-workers", default=16)
+@click.option("-p", "--limit-num-papers", default=None)
+@click.option("-f", "--input-json-file", default=f"{PROJECT_ROOT}/data/neurips-2025-orals-posters.json")
+def main(
+    embedding_model: str,
+    ollama_server_url: str,
+    embedding_gen_batch_size: int,
+    max_parallel_workers: int,
+    limit_num_papers: int,
+    input_json_file: str,
+):
 
     kg = PaperKnowledgeGraph(
-        embedding_model='nomic-embed-text',
-        ollama_base_url='http://localhost:11434',
-        embedding_gen_batch_size=32,
-        max_parallel_workers=16,
-        limit_num_papers=None
+        embedding_model=embedding_model,
+        ollama_base_url=ollama_server_url,
+        embedding_gen_batch_size=embedding_gen_batch_size,
+        max_parallel_workers=max_parallel_workers,
+        limit_num_papers=limit_num_papers
     )
 
     # Load papers from JSON file
-    kg.load_papers_from_json(f"{PROJECT_ROOT}/data/neurips-2025-orals-posters.json")
+    kg.load_papers_from_json(input_json_file)
 
     # Build the graph (parallel embedding generation)
     kg.build_graph()
@@ -369,10 +384,17 @@ if __name__ == "__main__":
     for key, value in stats.items():
         print(f"  {key}: {value}")
 
-    # Example: Find similar papers
+    # Test run: Find similar papers
     if kg.papers_data:
         first_paper_id = kg.papers_data[0].get('uid', kg.papers_data[0].get('id'))
         print(f"\nPapers similar to '{kg.graph.nodes[first_paper_id]['name']}':")
         similar = kg.find_similar_papers(first_paper_id, top_k=3)
         for pid, sim, name in similar:
             print(f"  - {name} (similarity: {sim:.3f})")
+
+
+
+
+# Run
+if __name__ == "__main__":
+    main()

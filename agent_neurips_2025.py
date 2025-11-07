@@ -1,4 +1,4 @@
-from tools.rag_search import search_papers  # <- the tool we expose
+from tools import search_papers, search_similar_papers, find_neighboring_papers, traverse_graph  # <- the tool we expose
 from utils.tool_chat import ToolChat
 import sys
 
@@ -19,7 +19,16 @@ def agent_respond(
     tool_args: dict = {}
 ):
     chat = ToolChat(model=model_name, api_base=api_base, api_key=api_key, default_params=llm_args)
-    return chat.tool_loop(messages, tool_funcs=[search_papers], tool_args=tool_args)
+    return chat.tool_loop(
+        messages,
+        tool_funcs=[
+            # search_papers,
+            search_similar_papers,
+            find_neighboring_papers,
+            traverse_graph
+        ],
+        tool_args=tool_args
+    )
 
 # if __name__ == "__main__":
 #     chat = ToolChat()

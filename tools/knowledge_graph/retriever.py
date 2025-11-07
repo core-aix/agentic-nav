@@ -1,11 +1,19 @@
 import numpy as np
+import random
 
 from neo4j import GraphDatabase
 from pathlib import Path
 
-from utils.embedding_generator import batch_embed_documents
+from typing import List, Dict, Any, Optional
 
-from typing import List, Dict, Any, Optional, Tuple
+from .graph_traversal_strategies import (
+    TraversalStrategy,
+    _graph_traversal_dfs_random,
+    _graph_traversal_cypher,
+    _graph_traversal_bfs_random
+)
+
+from utils.embedding_generator import batch_embed_documents
 
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -36,18 +44,7 @@ class Neo4jGraphWorker:
                labels(neighbor) as neighbor_labels
         """)
 
-    _DB_GRAPH_TRAVERSAL_QUERY = staticmethod(lambda rel_filter, n_hops: f"""
-        MATCH path = (start:Paper)-[{rel_filter}*1..{n_hops}]-(related:Paper)
-        WHERE start.id IN $start_paper_ids
-        AND related.id <> start.id
-        WITH related, min(length(path)) as min_distance
-        RETURN DISTINCT related.id as id,
-               related.name as name,
-               related.abstract as abstract,
-               related.topic as topic,
-               min_distance as distance
-        ORDER BY min_distance, related.name
-        """)
+    # Find the DB query for graph traversal in the graph_traversal sub-folder.
 
     _DB_PAPERS_BY_AUTHOR = """
         MATCH (p:Paper)-[:AUTHORED_BY]->(a:Author)
@@ -251,50 +248,109 @@ class Neo4jGraphWorker:
             return neighbors
 
     def graph_traversal(
-            self,
-            start_paper_ids: List[str],
-            n_hops: int = 2,
-            relationship_types: Optional[List[str]] = None,
-            max_results: Optional[int] = None
+        self,
+        start_paper_id: str,
+        n_hops: int = 2,
+        relationship_types: Optional[List[str]] = None,
+        max_results: Optional[int] = None,
+        strategy: str = TraversalStrategy.BFS,
+        max_branches: Optional[int] = None,
+        random_seed: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
         Traverse the graph for n hops from starting paper nodes.
 
         Args:
-            start_paper_ids: List of paper IDs to start traversal from
+            start_paper_id: Paper ID to start traversal from
             n_hops: Number of hops to traverse (1-5 recommended)
             relationship_types: Optional list of relationship types to traverse
             max_results: Optional maximum number of results to return
+            strategy: Traversal strategy (breadth_first, depth_first, breadth_first_random, depth_first_random)
+            max_branches: Maximum number of random neighbors to explore per node (only for random strategies)
+            random_seed: Optional seed for reproducible random sampling
 
         Returns:
             List of papers found through traversal with distance information
         """
-        with self.driver.session() as session:
-            # Build relationship type filter
-            if relationship_types:
-                rel_filter = f":{':'.join(relationship_types)}"
-            else:
-                rel_filter = ""
+        if random_seed is not None:
+            random.seed(random_seed)
 
-            query = self._DB_GRAPH_TRAVERSAL_QUERY(rel_filter=rel_filter, n_hops=n_hops)
+        # Use original Cypher-based approach for non-random strategies
+        if strategy in ["breadth_first", "depth_first"]:
+            return _graph_traversal_cypher(
+                self.driver,
+                start_paper_id,
+                n_hops,
+                relationship_types,
+                max_results
+            )
 
-            if max_results:
-                query += f" LIMIT {max_results}"
+        # Use Python-based traversal for random strategies
+        elif strategy == "breadth_first_random":
+            return _graph_traversal_bfs_random(
+                self.driver,
+                start_paper_id,
+                n_hops,
+                relationship_types,
+                max_results,
+                max_branches or 3
+            )
 
-            result = session.run(query, start_paper_ids=start_paper_ids)
+        elif strategy == "depth_first_random":
+            return _graph_traversal_dfs_random(
+                self.driver,
+                start_paper_id,
+                n_hops,
+                relationship_types,
+                max_results,
+                max_branches or 3
+            )
 
-            papers = []
-            for record in result:
-                paper = {
-                    'id': record['id'],
-                    'name': record['name'],
-                    'abstract': record['abstract'],
-                    'topic': record['topic'],
-                    'distance': record['distance']
-                }
-                papers.append(paper)
-
-            return papers
+    # def graph_traversal(
+    #     self,
+    #     start_paper_id: str,
+    #     n_hops: int = 2,
+    #     relationship_types: Optional[List[str]] = None,
+    #     max_results: Optional[int] = None
+    # ) -> List[Dict[str, Any]]:
+    #     """
+    #     Traverse the graph for n hops from starting paper nodes.
+    #
+    #     Args:
+    #         start_paper_id: Paper ID to start traversal from
+    #         n_hops: Number of hops to traverse (1-5 recommended)
+    #         relationship_types: Optional list of relationship types to traverse
+    #         max_results: Optional maximum number of results to return
+    #
+    #     Returns:
+    #         List of papers found through traversal with distance information
+    #     """
+    #     with self.driver.session() as session:
+    #         # Build relationship type filter
+    #         if relationship_types:
+    #             rel_filter = f":{':'.join(relationship_types)}"
+    #         else:
+    #             rel_filter = ""
+    #
+    #         query = self._DB_GRAPH_TRAVERSAL_QUERY(rel_filter=rel_filter, n_hops=n_hops)
+    #
+    #         if max_results:
+    #             query += f" LIMIT {max_results}"
+    #
+    #         result = session.run(query, start_paper_ids=[start_paper_id])
+    #
+    #         papers = []
+    #         for record in result:
+    #             paper = {
+    #                 'id': record['id'],
+    #                 'name': record['name'],
+    #                 'abstract': record['abstract'],
+    #                 'topic': record['topic'],
+    #                 'distance': record['distance']
+    #             }
+    #             papers.append(paper)
+    #
+    #         return papers
 
     def combined_search_workflow(
             self,
