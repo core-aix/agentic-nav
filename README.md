@@ -23,7 +23,18 @@ Download https://neurips.cc/static/virtual/data/neurips-2025-orals-posters.json 
 ```commandline
 wget -O data/neurips-2025-orals-posters.json https://neurips.cc/static/virtual/data/neurips-2025-orals-posters.json
 ```
+
+#### Regular RAG
 Run `uv run build_json_rag.py` to build the vector database for RAG. 
+
+#### GraphRAG
+Setting up a GraphRAG system requires a graph database. Inside `tools/knowledge_graph`, we provide a docker-compose file 
+for setting up a local neo4j database. 
+Run `docker compose -f tools/knowledge_graph/docker-compose.yaml up -d` first. 
+
+
+
+
 
 ### Agent interaction
 Run the following command.

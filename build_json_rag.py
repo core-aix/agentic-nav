@@ -11,6 +11,8 @@ import faiss
 from litellm import embedding
 from tqdm import tqdm
 
+from utils.embedding_generator import batch_embed_documents
+
 API_BASE = "http://localhost:11434"
 EMBED_MODEL = "ollama/nomic-embed-text"   # pull with: ollama pull nomic-embed-text
 INDEX_DIR = "rag_index_json"
@@ -52,7 +54,12 @@ def build_index(json_path: str, out_dir: str = INDEX_DIR) -> None:
     papers = _load_papers(json_path)
 
     texts = [f"{p['name']}\n\n{p['abstract']}" if "name" in p and "abstract" in p else "" for p in papers]
-    X = _embed(texts)
+    X = batch_embed_documents(
+        texts,
+        embedding_model=EMBED_MODEL,
+        api_base=API_BASE,
+        batch_size=32
+    )
     dim = X.shape[1]
     index = faiss.IndexFlatIP(dim)
     index.add(X)
