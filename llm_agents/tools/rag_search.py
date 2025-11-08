@@ -9,13 +9,13 @@ import time
 
 API_BASE = "http://localhost:11434"
 EMBED_MODEL = "ollama/nomic-embed-text"
-INDEX_DIR = "rag_index_json"
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 # TODO: Make this configurable
 
 # Load once at import (fast)
-_FAISS = faiss.read_index(str(Path(INDEX_DIR) / "faiss.index"))
-_META = json.loads(Path(INDEX_DIR, "meta.json").read_text())
+_FAISS = faiss.read_index(str(Path(f"{PROJECT_ROOT}/rag_index_json/faiss.index")))
+_META = json.loads(Path(f"{PROJECT_ROOT}/rag_index_json", "meta.json").read_text())
 
 def _embed_query(q: str) -> np.ndarray:
     resp = embedding(model=EMBED_MODEL, input=[q], api_base=API_BASE)

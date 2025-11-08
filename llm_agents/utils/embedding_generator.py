@@ -1,6 +1,5 @@
 import litellm
 import numpy as np
-import time
 
 from litellm import embedding
 from tqdm import tqdm

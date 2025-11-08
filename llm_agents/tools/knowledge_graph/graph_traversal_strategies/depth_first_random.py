@@ -8,7 +8,7 @@ def _graph_traversal_dfs_random(
     db_driver: neo4j.Driver,
     start_paper_id: str,
     n_hops: int,
-    relationship_types: Optional[List[str]],
+    relationship_type: Optional[str],
     max_results: Optional[int],
     max_branches: int
 ) -> List[Dict[str, Any]]:
@@ -21,8 +21,8 @@ def _graph_traversal_dfs_random(
         papers = []
 
         # Build relationship type filter
-        if relationship_types:
-            rel_filter = f":{':'.join(relationship_types)}"
+        if relationship_type:
+            rel_filter = f":{':'.join([relationship_type])}"
         else:
             rel_filter = ""
 

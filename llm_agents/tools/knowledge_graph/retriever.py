@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import random
 
@@ -6,17 +7,18 @@ from pathlib import Path
 
 from typing import List, Dict, Any, Optional
 
-from .graph_traversal_strategies import (
+from llm_agents.tools.knowledge_graph.graph_traversal_strategies import (
     TraversalStrategy,
     _graph_traversal_dfs_random,
     _graph_traversal_cypher,
     _graph_traversal_bfs_random
 )
 
-from utils.embedding_generator import batch_embed_documents
+from llm_agents.utils.embedding_generator import batch_embed_documents
 
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+LOGGER = logging.getLogger(__name__)
 
 
 class Neo4jGraphWorker:
@@ -251,7 +253,7 @@ class Neo4jGraphWorker:
         self,
         start_paper_id: str,
         n_hops: int = 2,
-        relationship_types: Optional[List[str]] = None,
+        relationship_type: Optional[str] = None,
         max_results: Optional[int] = None,
         strategy: str = TraversalStrategy.BFS,
         max_branches: Optional[int] = None,
@@ -263,7 +265,7 @@ class Neo4jGraphWorker:
         Args:
             start_paper_id: Paper ID to start traversal from
             n_hops: Number of hops to traverse (1-5 recommended)
-            relationship_types: Optional list of relationship types to traverse
+            relationship_type: Optional list of relationship types to traverse
             max_results: Optional maximum number of results to return
             strategy: Traversal strategy (breadth_first, depth_first, breadth_first_random, depth_first_random)
             max_branches: Maximum number of random neighbors to explore per node (only for random strategies)
@@ -277,31 +279,34 @@ class Neo4jGraphWorker:
 
         # Use original Cypher-based approach for non-random strategies
         if strategy in ["breadth_first", "depth_first"]:
+            LOGGER.debug(f"Doing a graph traversal with neo4j's built-in strategy")
             return _graph_traversal_cypher(
                 self.driver,
                 start_paper_id,
                 n_hops,
-                relationship_types,
+                relationship_type,
                 max_results
             )
 
         # Use Python-based traversal for random strategies
         elif strategy == "breadth_first_random":
+            LOGGER.debug(f"Doing a graph traversal with a random sampling breadth first strategy")
             return _graph_traversal_bfs_random(
                 self.driver,
                 start_paper_id,
                 n_hops,
-                relationship_types,
+                relationship_type,
                 max_results,
                 max_branches or 3
             )
 
         elif strategy == "depth_first_random":
+            LOGGER.debug(f"Doing a graph traversal with a random sampling depth first strategy")
             return _graph_traversal_dfs_random(
                 self.driver,
                 start_paper_id,
                 n_hops,
-                relationship_types,
+                relationship_type,
                 max_results,
                 max_branches or 3
             )

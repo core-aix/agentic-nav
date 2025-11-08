@@ -10,12 +10,12 @@ from tqdm import tqdm
 
 from pathlib import Path
 
-from utils.embedding_generator import batch_embed_documents
+from llm_agents.utils.embedding_generator import batch_embed_documents
 
 from .file_handler import save_graph
 
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 
 
 class PaperKnowledgeGraph:

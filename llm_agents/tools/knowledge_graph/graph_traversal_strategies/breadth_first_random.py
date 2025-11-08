@@ -8,7 +8,7 @@ def _graph_traversal_bfs_random(
     db_driver: neo4j.Driver,
     start_paper_id: str,
     n_hops: int,
-    relationship_types: Optional[List[str]],
+    relationship_type: Optional[str],
     max_results: Optional[int],
     max_branches: int
 ) -> List[Dict[str, Any]]:
@@ -22,13 +22,13 @@ def _graph_traversal_bfs_random(
         papers = []
 
         # Build relationship type filter
-        if relationship_types:
-            rel_filter = f":{':'.join(relationship_types)}"
+        if relationship_type:
+            rel_filter = f":{':'.join([relationship_type])}"
         else:
             rel_filter = ""
 
         while queue:
-            if max_results and len(papers) >= max_results:
+            if max_results and type(max_results) is int and len(papers) >= max_results:
                 break
 
             current_id, distance = queue.popleft()
@@ -74,7 +74,7 @@ def _graph_traversal_bfs_random(
                         # Add to queue for next level
                         queue.append((neighbor_id, distance + 1))
 
-                        if max_results and len(papers) >= max_results:
+                        if max_results and type(max_results) is int and len(papers) >= max_results:
                             break
 
         return papers

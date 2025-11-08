@@ -2,6 +2,20 @@
 
 
 ## Installation
+If you want to use the project, you can install it as a package by running
+```commandline
+git clone https://github.com/shiqiangw/llm-agents.git
+cd llm-agents
+pip install .
+```
+
+If you want to contribute to this package, you need to run the following command: 
+```commandline
+git clone https://github.com/shiqiangw/llm-agents.git
+cd llm-agents
+uv sync
+```
+
 Install Ollama and pull `nomic-embed-text` model for embedding computation used in RAG.
 ```commandline
 ollama pull nomic-embed-text
@@ -72,7 +86,7 @@ Run the following command.
 
 For local model:
 ```commandline
-uv run main_ui.py \
+uv run llm-agents-cli \
     -a http://localhost:11434 \
     -m ollama_chat/gpt-oss:20b \
     -t 0.4 \
@@ -83,7 +97,7 @@ uv run main_ui.py \
 
 For Ollama cloud model:
 ```commandline
-uv run main_ui.py \
+uv run llm-agents-cli \
     -a https://ollama.com \
     -k $OLLAMA_API_KEY \
     -m ollama_chat/gpt-oss:120b-cloud \

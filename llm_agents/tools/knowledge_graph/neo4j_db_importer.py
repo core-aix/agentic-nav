@@ -15,7 +15,7 @@ try:
 except ImportError:
     from file_handler import load_graph
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 
 
 class Neo4jImporter:

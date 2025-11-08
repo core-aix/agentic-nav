@@ -1,6 +1,5 @@
-from tools import search_papers, search_similar_papers, find_neighboring_papers, traverse_graph  # <- the tool we expose
-from utils.tool_chat import ToolChat
-import sys
+from llm_agents.tools import search_similar_papers, find_neighboring_papers, traverse_graph  # <- the tool we expose
+from llm_agents.utils import ToolChat
 
 system = {"role": "system", "content": "You are an assistant who can help browsing NeurIPS 2025 papers. "
 "You are provided with a search tool that can search all accepted papers of NeurIPS 2025. "

@@ -5,10 +5,9 @@ The idea is to put the actual functions into wrappers that provide LLM-friendly 
 import random
 
 from toon import encode as toon_encode
-
-from .retriever import Neo4jGraphWorker
-
 from typing import List, Optional
+
+from llm_agents.tools.knowledge_graph.retriever import Neo4jGraphWorker
 
 
 def search_similar_papers(
@@ -191,14 +190,12 @@ def find_neighboring_papers(
 def traverse_graph(
     start_paper_id: str,
     n_hops: int = 2,
-    relationship_types: Optional[List[str]] = ["BELONGS_TO_TOPIC"],
+    relationship_type: Optional[str] = "BELONGS_TO_TOPIC",
     max_results: Optional[int] = 30,
     strategy: str = "breadth_first_random",
     max_branches: Optional[int] = 2,
     random_seed: Optional[int] = 42
 ) -> str:
-    # TODO: This function is buggy at the moment as some operators in the cypher query are unstable. This needs
-    #  further investigation.
     """
     Traverse a Neo4j knowledge graph to discover related research papers through various relationship types.
 
@@ -210,8 +207,8 @@ def traverse_graph(
         start_paper_id (str): The unique identifier of the starting paper node in the graph. neo4j UUID.
         n_hops (int, optional): Number of relationship hops to traverse from the starting paper.
             Defaults to 2. Higher values explore further but may return less relevant results.
-        relationship_types (List[str], optional): Types of relationships to follow during traversal.
-            Defaults to ["BELONGS_TO_TOPIC"].
+        relationship_type (str, optional): Types of relationships to follow during traversal.
+            Defaults to "BELONGS_TO_TOPIC".
             Valid options: ["SIMILAR_TO", "AUTHORED_BY", "BELONGS_TO_TOPIC"]
         max_results (int, optional): Maximum number of papers to return. Defaults to 30.
         strategy (str, optional): Graph traversal strategy to use. Defaults to "breadth_first_random".
@@ -241,11 +238,14 @@ def traverse_graph(
         >>> related_papers = traverse_graph(
         ...     start_paper_id="paper_12345",
         ...     n_hops=3,
-        ...     relationship_types=["SIMILAR_TO", "BELONGS_TO_TOPIC"],
+        ...     relationship_type="SIMILAR_TO",
         ...     max_results=50,
         ...     strategy="breadth_first_random"
         ... )
     """
+
+    print(f"PAPER ID: {start_paper_id}")
+
     if type(relationship_types) is str:
         relationship_types = [relationship_types]
 
@@ -258,7 +258,7 @@ def traverse_graph(
     papers = worker.graph_traversal(
         start_paper_id=start_paper_id,
         n_hops=n_hops,
-        relationship_types=relationship_types,
+        relationship_type=relationship_type,
         max_results=max_results,
         strategy=strategy,
         max_branches=max_branches,

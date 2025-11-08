@@ -1,9 +1,8 @@
 # rag_build_json.py
 from __future__ import annotations
-from dataclasses import dataclass
 import time
-from typing import List, Dict, Any, Tuple
-import json, os, math
+from typing import List
+import json
 from pathlib import Path
 
 import numpy as np
@@ -11,11 +10,11 @@ import faiss
 from litellm import embedding
 from tqdm import tqdm
 
-from utils.embedding_generator import batch_embed_documents
+from llm_agents.utils import batch_embed_documents
 
 API_BASE = "http://localhost:11434"
 EMBED_MODEL = "ollama/nomic-embed-text"   # pull with: ollama pull nomic-embed-text
-INDEX_DIR = "rag_index_json"
+INDEX_DIR = "../rag_index_json"
 
 
 def _load_papers(json_path: str) -> List[Paper]:
@@ -71,4 +70,4 @@ def build_index(json_path: str, out_dir: str = INDEX_DIR) -> None:
 
 if __name__ == "__main__":
     # build_index("data/papers_test.json")
-    build_index("data/neurips-2025-orals-posters.json")
+    build_index("../data/neurips-2025-orals-posters.json")
