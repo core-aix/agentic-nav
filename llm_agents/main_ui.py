@@ -1,14 +1,3 @@
-import os
-import shutil
-import sys
-import tempfile
-import json
-import datetime
-
-import click
-from rich.console import Console
-from rich.markdown import Markdown
-
 """
 Lightweight terminal chat UI that interacts with an agent implementation.
 
@@ -25,15 +14,30 @@ Features:
 - Commands: /help, /exit, /system, /edit, /history, /save <path>
 """
 
+import os
+import tempfile
+import json
+import datetime
+
+import click
+from rich.console import Console
+from rich.markdown import Markdown
+
+from pathlib import Path
+
+from llm_agents.utils.logging import setup_logging
 
 # Try to import agent_respond from main.py
 try:
-    from agent_neurips_2025 import agent_respond, msgs  # main.py should define this
+    from llm_agents.agent_neurips_2025 import agent_respond, msgs  # main.py should define this
 except Exception as e:
     raise RuntimeError(
         "Could not import agent_respond from main.py. "
         "Please implement def agent_respond(messages: list[dict]) -> dict in main.py"
     )
+
+
+PROJECT_ROOT = Path(__file__).parent
 
 console = Console(soft_wrap=True)
 def render_markdown(text):
@@ -108,6 +112,13 @@ def save_history(messages, path):
 @click.option("-c", "--num-ctx", default=131072, type=int, help="Specify the model context window.")
 @click.option("-l", "--max-num-papers", default=50, type=int, help="Specify the maximum number of papers to retrieve.")
 def main(api_base, api_key, model, temperature, max_tokens, num_ctx, max_num_papers):
+
+    # Setup logging
+    setup_logging(
+        log_dir=f"logs", # This directory will spawn in the directory wherever main() is called from.
+        level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "DEBUG")
+    )
+
     messages = msgs.copy()
     # Optionally seed with a system message; leave empty by default
     # messages.append({"role": "system", "content": "You are a helpful assistant.", "_ts": str(datetime.utcnow())})

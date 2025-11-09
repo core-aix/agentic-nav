@@ -9,6 +9,11 @@ from rich.live import Live
 from rich.text import Text
 
 
+import logging
+
+LOGGER = logging.getLogger(__name__)
+
+
 # litellm._turn_on_debug()
 
 
@@ -71,9 +76,10 @@ class ToolChat:
 
         console = Console()
 
-        print(self.api_key)
+        LOGGER.debug(f"LLM API Key: {self.api_key}")
         with console.screen():
             console.print("\n[bold green]Assistant is working...[/bold green]\n")
+            LOGGER.debug(f"Assistant working on query")
             
             for _ in range(max_rounds):
                 stream_iter = litellm.completion(
@@ -127,6 +133,7 @@ class ToolChat:
                         collected += content
                 # append the assembled assistant message so tool execution sees the assistant's follow-up
                 msgs.append({"role": "assistant", "content": collected})
+                LOGGER.debug(f"Agent response: {collected}")
 
                 if not calls:
                     return msgs
@@ -147,9 +154,12 @@ class ToolChat:
                     args = call["function"].get("arguments", "{}")
                     try:
                         parsed = json.loads(args) if isinstance(args, str) else (args or {})
+                        LOGGER.debug(f"Tool call arguments: {parsed}")
                     except json.JSONDecodeError:
                         parsed = {}
+                        LOGGER.debug(f"Tool call arguments: COULD NOT BE PARSED")
                     out = registry[name](**parsed)
+                    LOGGER.debug(f"Tool Response: \n{out}")
                     msgs.append({
                         "role": "tool",
                         "tool_call_id": call.get("id"),

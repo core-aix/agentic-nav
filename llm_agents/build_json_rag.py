@@ -1,9 +1,8 @@
 # rag_build_json.py
 from __future__ import annotations
-from dataclasses import dataclass
 import time
-from typing import List, Dict, Any, Tuple
-import json, os, math
+from typing import List
+import json
 from pathlib import Path
 
 import numpy as np
@@ -11,9 +10,11 @@ import faiss
 from litellm import embedding
 from tqdm import tqdm
 
+from llm_agents.utils import batch_embed_documents
+
 API_BASE = "http://localhost:11434"
 EMBED_MODEL = "ollama/nomic-embed-text"   # pull with: ollama pull nomic-embed-text
-INDEX_DIR = "rag_index_json"
+INDEX_DIR = "../rag_index_json"
 
 
 def _load_papers(json_path: str) -> List[Paper]:
@@ -52,7 +53,12 @@ def build_index(json_path: str, out_dir: str = INDEX_DIR) -> None:
     papers = _load_papers(json_path)
 
     texts = [f"{p['name']}\n\n{p['abstract']}" if "name" in p and "abstract" in p else "" for p in papers]
-    X = _embed(texts)
+    X = batch_embed_documents(
+        texts,
+        embedding_model=EMBED_MODEL,
+        api_base=API_BASE,
+        batch_size=32
+    )
     dim = X.shape[1]
     index = faiss.IndexFlatIP(dim)
     index.add(X)
@@ -64,4 +70,4 @@ def build_index(json_path: str, out_dir: str = INDEX_DIR) -> None:
 
 if __name__ == "__main__":
     # build_index("data/papers_test.json")
-    build_index("data/neurips-2025-orals-posters.json")
+    build_index("../data/neurips-2025-orals-posters.json")
