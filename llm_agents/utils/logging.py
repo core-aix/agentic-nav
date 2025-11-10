@@ -1,6 +1,9 @@
 import logging
 import logging.handlers
+
+from datetime import datetime
 from pathlib import Path
+
 
 
 def setup_logging(log_dir: str = "logs", level: str = "INFO"):
@@ -20,8 +23,10 @@ def setup_logging(log_dir: str = "logs", level: str = "INFO"):
     console_handler.setFormatter(console_format)
 
     # File handler - for production
+    time_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+
     file_handler = logging.handlers.RotatingFileHandler(
-        f"{log_dir}/llm_agents.log",
+        f"{log_dir}/{time_now}_llm_agents.log",
         maxBytes=10 * 1024 * 1024,  # 10MB
         backupCount=5
     )

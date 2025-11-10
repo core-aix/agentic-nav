@@ -109,3 +109,9 @@ uv run llm-agents-cli \
 
 The backend uses LiteLLM, which allows you to use a variety of LLM inference endpoints. 
 Find details on the various providers [here](https://docs.litellm.ai/docs/providers).
+
+
+### Debugging agent interactions
+The agent involves a set of asynchronous operations. We provide a built-in logging instance to capture all relevant logs 
+for debugging. To set the right debugging level for your application, you can use the environment variable `LLM_AGENTS_LOG_LEVEL`. 
+By default, it is set to `INFO`.
