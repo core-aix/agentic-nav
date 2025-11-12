@@ -1,5 +1,4 @@
-# llm-agents
-
+# LLMAgents - A collection of agents for doing scientific work
 
 ## Installation
 If you want to use the project, you can install it as a package by running
@@ -13,21 +12,29 @@ If you want to contribute to this package, you need to run the following command
 ```commandline
 git clone https://github.com/shiqiangw/llm-agents.git
 cd llm-agents
+
+# The following commands are only needed in you'd like to use the gradio-based GUI
+# This will eventually go away once gradio bumps their release version
+bash scripts/prepare_gradio.sh
+
+# Install project dependencies
 uv sync
 ```
 
-Install Ollama and pull `nomic-embed-text` model for embedding computation used in RAG.
+**Note:** We are using gradio built from source as the latest release (as of Nov. 12, 2025) does not yet support python 3.14.
+
+Install Ollama and pull the `nomic-embed-text` model for embedding computation used in RAG.
 ```commandline
 ollama pull nomic-embed-text
 ```
 
-To use local model, also pull 
+To use a local model, also pull, for example, 
 ```commandline
 ollama pull gpt-oss:20b
 ```
 
-The chat model can be configured to use `gpt-oss:120b-cloud`. To use it, get an Ollama API key and pass it in the command line args (see below).
-
+The chat model can be configured to use `gpt-oss:120b-cloud`. 
+To use it, get an Ollama API key and pass it in the command line args (see below).
 
 
 ## Agent for NeurIPS 2025 papers
@@ -48,6 +55,7 @@ docker compose -f database/docker-compose.yaml up -d
 ```
 
 Wait until the database is ready. 
+
 
 #### Build the knowledge graph
 You can build the knowledge graph per your needs by running the following script: 
@@ -82,6 +90,12 @@ Run `uv run build_json_rag.py` to build the vector database for RAG.
 
 
 ### Agent interactions
+We offer two ways of interacting with agents, via the command line and via the browser.
+The backend uses LiteLLM, which allows you to use a variety of LLM inference endpoints. 
+Find details on the various providers [here](https://docs.litellm.ai/docs/providers).
+
+#### Commandline interface
+
 Run the following command.
 
 For local model:
@@ -107,8 +121,15 @@ uv run llm-agents-cli \
     --max-num-papers 10
 ```
 
-The backend uses LiteLLM, which allows you to use a variety of LLM inference endpoints. 
-Find details on the various providers [here](https://docs.litellm.ai/docs/providers).
+#### Web-based interface (beginner friendly)
+We use gradio to provide a chat interface with the same functionalities as the commandline-based interface. 
+You can launch the web app by running: 
+```commandline
+llm-agents-web
+```
+
+All the hyperparameters you need to set can be configured in the web interface and will be used in you individual session.
+Once you close the browser window, your session will terminate and all custom configuration will be removed.
 
 
 ### Debugging agent interactions

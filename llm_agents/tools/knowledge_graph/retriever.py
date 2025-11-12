@@ -588,6 +588,12 @@ class Neo4jGraphWorker:
                 'total_collaborators': len(collaborations)
             }
 
+    def find_posters_by_session(self):
+        # TODO: Import metadata into the graph
+        # TODO: Create a tool to plan the visit schedule for a single poster session.
+        # TODO: Tool design: Have a tool to filter by poster session and topic. Write it manually for now.
+        pass
+
 
 # Test
 if __name__ == "__main__":

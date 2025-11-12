@@ -58,57 +58,8 @@ class LLMAgent:
             message["_ts"] = str(datetime.now(UTC))
 
         self.messages.append(message)
-
         for _ in range(self.max_interaction_rounds):
-            stream_iter = litellm.completion(
-                model=self.model,
-                messages=self.messages,
-                tools=self.tool_descriptions,
-                tool_choice="auto",
-                api_base=self.api_base,
-                api_key=self.api_key,
-                stream=True,
-                **self.llm_args,
-            )
-
-            collected = ""
-            calls = []
-
-            for chunk in stream_iter:
-                choices = chunk.get("choices", []) or []
-                if not choices:
-                    continue
-                choice = choices[0]
-
-                # try several places where partial content may appear
-                content = None
-                delta = choice.get("delta")
-
-                if "content" in delta:
-                    content = delta["content"]
-                elif "message" in delta and isinstance(delta["message"], dict):
-                    content = delta["message"].get("content")
-
-                if "tool_calls" in delta:
-                    calls.extend(delta["tool_calls"] or [])
-
-                if content is None:
-                    msg = choice.get("message")
-                    if isinstance(msg, dict):
-                        content = msg.get("content")
-
-                if content is None:
-                    content = choice.get("text")
-
-                if content:
-                    if not isinstance(content, str):
-                        try:
-                            content = json.dumps(content, ensure_ascii=False)
-                        except Exception as e:
-                            LOGGER.error(f"JSON encoding error encountered. {e}. Treating agent response as regular text.")
-                            content = str(content)
-
-                    collected += content
+            collected, calls = self._send_to_llm(messages=self.messages)
             # append the assembled assistant message so tool execution sees the assistant's follow-up
             self.messages.append({"role": "assistant", "content": collected, "_ts": str(datetime.now(UTC))})
             LOGGER.debug(f"Agent response: {collected}")
@@ -128,6 +79,112 @@ class LLMAgent:
                 )
 
         return self.messages
+
+    def interact_stateless(
+        self,
+        messages: List[Dict],
+        model: str,
+        api_base: str,
+        api_key: str,
+        llm_args: Dict = None
+    ):
+        """
+        This method is designed to support multi-user sessions and requires state management outside the agent class.
+        """
+        assert self.tool_registry is not None, "Make sure to call 'setup_agent()' before the first interaction."
+        assert self.tool_descriptions is not None, "Make sure to call 'setup_agent()' before the first interaction."
+
+        # Do a sanity check for all messages
+        for message in messages:
+            if "_ts" not in message.keys():
+                message["_ts"] = str(datetime.now(UTC))
+
+        for _ in range(self.max_interaction_rounds):
+            collected, calls = self._send_to_llm(
+                messages=messages,
+                model=model,
+                api_base=api_base,
+                api_key=api_key,
+                llm_args=llm_args
+            )
+            messages.append({"role": "assistant", "content": collected, "_ts": str(datetime.now(UTC))})
+            LOGGER.debug(f"Agent response: {collected}")
+
+            if not calls:
+                return messages
+            else:
+                messages[-1]["tool_calls"] = calls
+                LOGGER.debug(f"Agent requested tool calls: {calls}")
+
+            # execute tools and append results
+            for call in calls:
+                messages.append(
+                    self.call_tool(
+                        tool_call=call
+                    )
+                )
+
+        return messages
+
+    def _send_to_llm(
+        self,
+        messages: List[Dict],
+        model: str,
+        api_base: str,
+        api_key: str,
+        llm_args: Dict = None
+    ):
+        stream_iter = litellm.completion(
+            model=model if model is not None else self.model,
+            messages=messages,
+            tools=self.tool_descriptions,
+            tool_choice="auto",
+            api_base=api_base if api_base is not None else self.api_base,
+            api_key=api_key if api_key is not None else self.api_key,
+            stream=True,
+            **llm_args if llm_args is not None else self.llm_args,
+        )
+
+        collected = ""
+        calls = []
+
+        for chunk in stream_iter:
+            choices = chunk.get("choices", []) or []
+            if not choices:
+                continue
+            choice = choices[0]
+
+            # try several places where partial content may appear
+            content = None
+            delta = choice.get("delta")
+
+            if "content" in delta:
+                content = delta["content"]
+            elif "message" in delta and isinstance(delta["message"], dict):
+                content = delta["message"].get("content")
+
+            if "tool_calls" in delta:
+                calls.extend(delta["tool_calls"] or [])
+
+            if content is None:
+                msg = choice.get("message")
+                if isinstance(msg, dict):
+                    content = msg.get("content")
+
+            if content is None:
+                content = choice.get("text")
+
+            if content:
+                if not isinstance(content, str):
+                    try:
+                        content = json.dumps(content, ensure_ascii=False)
+                    except Exception as e:
+                        LOGGER.error(f"JSON encoding error encountered. {e}. Treating agent response as regular text.")
+                        content = str(content)
+
+                collected += content
+
+        return collected, calls
 
     def call_tool(self, tool_call: Dict):
         name = tool_call["function"]["name"]
@@ -151,24 +208,29 @@ class LLMAgent:
             "_ts": str(datetime.now(UTC))
         }
 
+    def set_history(self, messages):
+        self.messages = messages
+        LOGGER.info(f"Set new message history.")
+
     def get_history(self):
         return self.messages
 
-    def set_system_prompt(self, new_system_prompt: str):
-        self.messages = [m for m in self.messages if m.get("role") != "system"]
-        self.messages.insert(0, {
+    @staticmethod
+    def set_system_prompt(new_system_prompt: str, messages: List[Dict]):
+        messages = [m for m in messages if m.get("role") != "system"]
+        messages.insert(0, {
             "role": "system",
             "content": new_system_prompt,
             "_ts": str(datetime.now(UTC))
         })
         LOGGER.info(f"New system prompt set and configured.")
         LOGGER.debug(f"New system prompt: {new_system_prompt}")
+        return messages
 
     def get_system_prompt(self):
         for message in self.messages:
-            if "role" in message.keys():
-                if message["role"] == "system":
-                    return message["content"]
+            if "role" in message.keys() and message["role"] == "system":
+                return message
 
         return None
 

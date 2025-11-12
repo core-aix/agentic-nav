@@ -8,32 +8,50 @@ Features matching terminal UI:
 - Save chat history to file
 - All model configuration options
 - Clear chat functionality
-- **Per-user agent instances using session state**
+- **Per-user conversation state management with stateless agent**
 """
+from venv import logger
+
 import gradio as gr
 import os
 import datetime
 import logging
 import json
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 
-from llm_agents.agents import NeurIPS2025Agent
+from llm_agents.agents import NeurIPS2025Agent, DEFAULT_NEURIPS2025_AGENT_ARGS
 from llm_agents.utils.logging import setup_logging
 from llm_agents.utils.file_handlers import save_chat_history
 
 LOGGER = logging.getLogger(__name__)
 
+# Setup logging (only needs to be done once globally)
+setup_logging(
+    log_dir="logs",
+    level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "DEBUG")
+)
+
+AGENT = NeurIPS2025Agent(
+    model=DEFAULT_NEURIPS2025_AGENT_ARGS["model"],
+    api_base=DEFAULT_NEURIPS2025_AGENT_ARGS["api_base"],
+    api_key=DEFAULT_NEURIPS2025_AGENT_ARGS["api_key"],
+    llm_args=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"],
+    global_tool_args=DEFAULT_NEURIPS2025_AGENT_ARGS["global_tool_args"],
+)
+# This is needed to configure the tools
+AGENT.setup_session()
+
 
 def initialize_agent(
-    api_base: str,
-    api_key: str,
-    model: str,
-    temperature: float,
-    max_tokens: int,
-    num_ctx: int,
-    max_num_papers: int,
-    current_agent: Optional[NeurIPS2025Agent]
+        api_base: str,
+        api_key: str,
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        num_ctx: int,
+        max_num_papers: int,
+        current_config: Dict
 ):
     """Initialize the agent with given configuration.
 
@@ -45,154 +63,166 @@ def initialize_agent(
         max_tokens: Max tokens to generate
         num_ctx: Context window size
         max_num_papers: Max papers to retrieve
-        current_agent: Current agent instance (if any)
+        current_config: Current configuration dict
+        messages: List of chat messages
 
     Returns:
-        Tuple of (agent_instance, status_message)
+        Tuple of (agent_instance, config_dict, status_message)
     """
-    # Setup logging (only needs to be done once globally)
-    setup_logging(
-        log_dir="logs",
-        level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "INFO")
-    )
-
     LOGGER.info(f"Agent runtime started via Gradio UI for session")
+    current_config.update({
+        "model": model,
+        "api_base": api_base,
+        "api_key": api_key,
+        "llm_args": {
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "num_ctx": num_ctx
+        },
+        "global_tool_args": {"max_num_papers": max_num_papers}
+    })
 
-    # Config for the LLM messages
-    llm_config = {
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "num_ctx": num_ctx
-    }
-    LOGGER.info(f"LLM configuration: {llm_config}")
+    current_config_to_print = current_config.copy()
+    del current_config_to_print["api_key"]
+    LOGGER.info(f"User-defined configuration saved. Config: {current_config_to_print}")
 
-    # Parameters to limit the tool calling scope
-    tool_args = {
-        "num_records": max_num_papers
-    }
-    LOGGER.info(f"Global tool arguments: {tool_args}")
-
-    # Create new agent instance
-    agent = NeurIPS2025Agent(
-        model=model,
-        api_base=api_base,
-        api_key=api_key,
-        llm_args=llm_config,
-        global_tool_args=tool_args,
-    )
-
-    agent.setup_session()
-    LOGGER.info("Agent session initialized for user")
-
-    return agent, "✓ Agent initialized successfully!"
+    return current_config, "✓ Agent initialized successfully!"
 
 
-def chat_fn(message: str, history: List[Tuple[str, str]], agent: Optional[NeurIPS2025Agent]) -> Tuple[List[Tuple[str, str]], str, Optional[NeurIPS2025Agent]]:
+def chat_fn(
+        message: str,
+        history: List[Tuple[str, str]],
+        config: Optional[Dict],
+        messages: Optional[List[Dict]]
+) -> Tuple[List[Tuple[str, str]], Optional[List[Dict]]]:
     """
-    Handle chat interaction.
+    Handle chat interaction using stateless agent.
 
     Args:
         message: User's input message
         history: Chat history as list of (user_msg, assistant_msg) tuples
-        agent: Current agent instance
+        config: Configuration dict with model, api_base, api_key, llm_args
+        messages: Current conversation messages list
 
     Returns:
-        Tuple of (updated_history, empty_string_to_clear_input, agent_instance)
+        Tuple of (updated_history, messages)
     """
-    if agent is None:
-        return history + [(message, "⚠️ Please initialize the agent first using the settings panel.")], "", agent
-
     if not message.strip():
-        return history, "", agent
+        return history, messages
 
     LOGGER.debug(f"USER PROMPT: {message}")
+    assert messages is not None, "Make sure to properly initialize the agent by using the 'Model Config' on the right."
 
     try:
-        # Create message with timestamp
-        next_message = {
+
+        # Create user message with timestamp
+        user_message = {
             "role": "user",
             "content": message,
-            "_ts": str(datetime.datetime.now(datetime.UTC))
+            "_ts": str(datetime.datetime.now(datetime.timezone.utc))
         }
 
-        # Call the agent
-        agent.interact(message=next_message)
+        # Add user message to conversation
+        messages.append(user_message)
 
-        # Get assistant response
-        assistant_message = agent.get_most_recent_assistant_message()
-        assistant_content = assistant_message["content"]
+        # Call the agent using stateless method
+        messages = AGENT.interact_stateless(
+            messages=messages,
+            model=config["model"],
+            api_base=config["api_base"],
+            api_key=config["api_key"],
+            llm_args=config["llm_args"]
+        )
+
+        # Get assistant response (last assistant message)
+        assistant_content = None
+        for msg in reversed(messages):
+            if msg.get("role") == "assistant":
+                assistant_content = msg["content"]
+                break
+
+
+        if assistant_content is None:
+            assistant_content = "No response from agent."
 
         # Append to history
         history.append((message, assistant_content))
 
         LOGGER.info("Agent response generated successfully")
-        return history, "", agent
+        return history, messages
 
     except Exception as e:
         LOGGER.error(f"Agent encountered an error: {e}")
         error_msg = f"❌ Error: {str(e)}"
         history.append((message, error_msg))
-        return history, "", agent
+        return history, messages
 
 
-def update_system_prompt(new_prompt: str, agent: Optional[NeurIPS2025Agent]) -> Tuple[str, Optional[NeurIPS2025Agent]]:
-    """Update the agent's system prompt.
+def update_system_prompt(
+    new_prompt: str,
+    messages: Optional[List[Dict]]
+) -> Tuple[str, Optional[List[Dict]]]:
+    """Update the system prompt in the message history.
 
     Args:
         new_prompt: New system prompt
-        agent: Current agent instance
+        config: Current configuration
+        messages: Current message history
 
     Returns:
-        Tuple of (status_message, agent_instance)
+        Tuple of (status_message, agent_instance, config, updated_messages)
     """
-    if agent is None:
-        return "⚠️ Please initialize the agent first.", agent
-
     if not new_prompt.strip():
-        return "⚠️ System prompt cannot be empty.", agent
+        return "System prompt cannot be empty.", messages
 
     try:
-        agent.set_system_prompt(new_system_prompt=new_prompt)
+        # Initialize messages if None
+        if messages is None:
+            messages = []
+
+        # Use the static method to update system prompt
+        messages = AGENT.set_system_prompt(new_system_prompt=new_prompt, messages=messages)
+
         LOGGER.info("System prompt updated")
-        return "✓ System prompt updated successfully!", agent
+        LOGGER.info(f"New system prompt: {messages[0]}")
+        return "✓ System prompt updated successfully!", messages
     except Exception as e:
         LOGGER.error(f"Error updating system prompt: {e}")
-        return f"❌ Error: {str(e)}", agent
+        return f"Error: {str(e)}", messages
 
 
-def view_history(agent: Optional[NeurIPS2025Agent]) -> str:
+def view_history(messages: Optional[List[Dict]]) -> str:
     """View the full conversation history in JSON format.
 
     Args:
-        agent: Current agent instance
+        messages: Current message history
 
     Returns:
         JSON formatted history string
     """
-    if agent is None:
-        return "⚠️ Please initialize the agent first."
+    if messages is None:
+        return "⚠️ No conversation history yet."
 
     try:
-        history = agent.get_history()
         # Format as pretty JSON
-        return json.dumps(history, indent=2, ensure_ascii=False)
+        return json.dumps(messages, indent=2, ensure_ascii=False)
     except Exception as e:
         LOGGER.error(f"Error viewing history: {e}")
         return f"❌ Error: {str(e)}"
 
 
-def save_history(filename: str, agent: Optional[NeurIPS2025Agent]) -> str:
+def save_history(filename: str, messages: Optional[List[Dict]]) -> str:
     """Save chat history to a JSON file.
 
     Args:
         filename: Optional filename
-        agent: Current agent instance
+        messages: Current message history
 
     Returns:
         Status message
     """
-    if agent is None:
-        return "⚠️ Please initialize the agent first."
+    if messages is None or len(messages) == 0:
+        return "⚠️ No conversation history to save."
 
     try:
         # Create directory if it doesn't exist
@@ -214,7 +244,7 @@ def save_history(filename: str, agent: Optional[NeurIPS2025Agent]) -> str:
                 filename += ".json"
 
         # Save the history
-        save_chat_history(agent.get_history(), filename)
+        save_chat_history(messages, filename)
 
         LOGGER.info(f"Chat history saved to {filename}")
         return f"✓ Chat history saved to: {filename}"
@@ -224,64 +254,38 @@ def save_history(filename: str, agent: Optional[NeurIPS2025Agent]) -> str:
         return f"❌ Error: {str(e)}"
 
 
-def clear_chat(agent: Optional[NeurIPS2025Agent]) -> Tuple[List, str, Optional[NeurIPS2025Agent]]:
-    """Clear the chat history in the UI and reinitialize agent session.
+def clear_chat(
+        config: Optional[Dict],
+        messages: Optional[List[Dict]]
+) -> Tuple[str, List, Optional[List[Dict]]]:
+    """Clear the chat history in the UI and reset message list.
 
     Args:
-        agent: Current agent instance
+        config: Current configuration
+        messages: Current message history
 
     Returns:
-        Tuple of (empty_history, status_message, agent_instance)
+        Tuple of (empty_history, status_message, agent_instance, config, empty_messages)
     """
-    if agent is not None:
-        try:
-            agent.setup_session()  # Reinitialize session
-            LOGGER.info("Chat cleared and session reinitialized")
-            return [], "✓ Chat cleared!", agent
-        except Exception as e:
-            LOGGER.error(f"Error clearing chat: {e}")
-            return [], f"❌ Error: {str(e)}", agent
-
-    return [], "⚠️ Agent not initialized.", agent
+    return "✓ Chat cleared!", [], [AGENT.get_system_prompt()]
 
 
 def main():
     with gr.Blocks(title="SciAgent For NeurIPS 2025", theme=gr.themes.Soft()) as webapp:
         gr.Markdown("# 🤖 SciAgent For NeurIPS 2025")
         gr.Markdown("Initialize the agent with your settings, then start chatting!")
-        gr.Markdown("*Each user session has its own independent agent instance. Enjoy!*")
+        gr.Markdown("*Each user session has its own independent conversation state. Enjoy!*")
 
-        # Session state for agent instance
-        agent_state = gr.State(value=None)
+        # Session state for agent instance, config, and messages
+        config_state = gr.State(value=DEFAULT_NEURIPS2025_AGENT_ARGS)
+        messages_state = gr.State(value=[AGENT.get_system_prompt()])
 
         with gr.Row():
-            with gr.Column(scale=2):
-                # Main chat interface
-                chatbot = gr.Chatbot(
-                    label="Conversation Trail",
-                    height=500,
-                    type="messages",
-                    show_copy_button=True,
-                )
-
-                with gr.Row():
-                    msg_input = gr.Textbox(
-                        label="Your message",
-                        placeholder="Type your message here...",
-                        lines=3,
-                        scale=4
-                    )
-                    submit_btn = gr.Button("Send", variant="primary", scale=1)
-
-                with gr.Row():
-                    clear_btn = gr.Button("🗑️ Clear Chat", size="sm")
-                    save_btn = gr.Button("💾 Save History", size="sm")
-
             with gr.Column(scale=1):
                 # Settings panel
                 gr.Markdown("### ⚙️ Agent Settings")
 
-                with gr.Accordion("Model Configuration", open=False):
+                with gr.Accordion("Model Configuration", open=True):
                     api_base_input = gr.Textbox(
                         label="API Base URL",
                         value="http://localhost:11434",
@@ -304,7 +308,7 @@ def main():
                     temperature_input = gr.Slider(
                         label="Temperature",
                         minimum=0.0,
-                        maximum=2.0,
+                        maximum=1.0,
                         value=0.2,
                         step=0.1
                     )
@@ -312,9 +316,9 @@ def main():
                     max_tokens_input = gr.Slider(
                         label="Max Tokens",
                         minimum=100,
-                        maximum=32000,
+                        maximum=8192,
                         value=6000,
-                        step=100
+                        step=10
                     )
 
                     num_ctx_input = gr.Number(
@@ -325,8 +329,8 @@ def main():
 
                     max_papers_input = gr.Slider(
                         label="Max Papers to Retrieve",
-                        minimum=1,
-                        maximum=200,
+                        minimum=0,
+                        maximum=100,
                         value=50,
                         step=1
                     )
@@ -337,6 +341,7 @@ def main():
                 with gr.Accordion("System Prompt", open=False):
                     system_prompt_input = gr.Textbox(
                         label="System Prompt",
+                        value=AGENT.get_system_prompt()["content"] if type(AGENT.get_system_prompt()) is dict else None,
                         placeholder="Enter custom system prompt here...",
                         lines=8
                     )
@@ -358,71 +363,102 @@ def main():
                     )
                     save_status = gr.Textbox(label="Save Status", interactive=False)
 
+            with gr.Column(scale=2):
+                # Main chat interface
+                chatbot = gr.Chatbot(
+                    label="Conversation Trail",
+                    height=500,
+                    type="tuples",
+                    show_copy_button=True,
+                )
+
+                with gr.Row():
+                    msg_input = gr.Textbox(
+                        label="Your message",
+                        placeholder="Type your message here...",
+                        lines=3,
+                        scale=4
+                    )
+                    submit_btn = gr.Button("Send", variant="primary", scale=1)
+
+                with gr.Row():
+                    clear_btn = gr.Button("🗑️ Clear Chat", size="sm")
+                    save_btn = gr.Button("💾 Save History", size="sm")
+
         # Event handlers
         init_btn.click(
             fn=initialize_agent,
             inputs=[
-                api_base_input, api_key_input, model_input,
-                temperature_input, max_tokens_input, num_ctx_input,
-                max_papers_input, agent_state
+                api_base_input,
+                api_key_input,
+                model_input,
+                temperature_input,
+                max_tokens_input,
+                num_ctx_input,
+                max_papers_input,
+                config_state
             ],
-            outputs=[agent_state, init_status]
+            outputs=[config_state, init_status]
         )
 
         # Chat submission
         submit_btn.click(
             fn=chat_fn,
-            inputs=[msg_input, chatbot, agent_state],
-            outputs=[chatbot, msg_input, agent_state]
+            inputs=[msg_input, chatbot, config_state, messages_state],
+            outputs=[chatbot, messages_state]
         )
 
         msg_input.submit(
-            fn=chat_fn,
-            inputs=[msg_input, chatbot, agent_state],
-            outputs=[chatbot, msg_input, agent_state]
+            fn=chat_fn, # lambda msg_input, chatbot, config_state, message_state: chat_fn(msg_input, clean_history(chatbot), config_state, messages_state),
+            inputs=[msg_input, chatbot, config_state, messages_state],
+            outputs=[chatbot, messages_state]
         )
 
         # System prompt update
         update_system_btn.click(
             fn=update_system_prompt,
-            inputs=[system_prompt_input, agent_state],
-            outputs=[system_status, agent_state]
+            inputs=[
+                system_prompt_input,
+                messages_state
+            ],
+            outputs=[system_status, messages_state]
         )
 
         # History viewing
         view_history_btn.click(
             fn=view_history,
-            inputs=agent_state,
+            inputs=messages_state,
             outputs=history_output
         )
 
         # Save history
         save_btn.click(
             fn=save_history,
-            inputs=[save_filename_input, agent_state],
+            inputs=[save_filename_input, messages_state],
             outputs=save_status
         )
 
         # Clear chat
         clear_btn.click(
             fn=clear_chat,
-            inputs=agent_state,
-            outputs=[chatbot, save_status, agent_state]
+            inputs=[config_state, messages_state],
+            outputs=[save_status, chatbot, messages_state]
         )
 
         # Help text at bottom
         gr.Markdown("""
         ### 📖 Usage Guide
-    
+
         1. **Initialize**: Configure settings and click "Initialize Agent"
         2. **Chat**: Type messages and press Enter or click Send
         3. **System Prompt**: Customize the agent's behavior via System Prompt panel
         4. **History**: View or save your conversation using the History & Save panel
         5. **Clear**: Start a fresh conversation with the Clear Chat button
-    
+
         All features from the terminal UI are available here!
-        
-        **Note**: Each browser session maintains its own independent agent instance.
+
+        **Note**: Each browser session maintains its own independent conversation state.
+        Uses stateless agent interaction for better concurrency support.
         """)
 
     webapp.launch(
@@ -430,8 +466,9 @@ def main():
         server_port=7860,  # Default Gradio port
         share=False,  # Set to True to create a public link
         show_error=True,
-        debug=True
+        debug=True,
     )
+
 
 if __name__ == "__main__":
     main()

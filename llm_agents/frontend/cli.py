@@ -103,7 +103,7 @@ def main(api_base, api_key, model, temperature, max_tokens, num_ctx, max_num_pap
                 continue
 
             elif cmd == "/exit":
-                print("Goodbye.")
+                LOGGER.info("Goodbye!")
                 break
 
             elif cmd == "/edit":
@@ -111,19 +111,23 @@ def main(api_base, api_key, model, temperature, max_tokens, num_ctx, max_num_pap
                 if content:
                     next_message = {"role": "user", "content": content, "_ts": str(datetime.datetime.now(datetime.UTC))}
                 else:
-                    print("(no content)")
+                    LOGGER.warning("No content found. Continuing...")
                     continue
 
             elif cmd == "/system":
                 content = open_editor()
                 if content:
-                    agent.set_system_prompt(
-                        new_system_prompt= content
+                    messages = agent.set_system_prompt(
+                        messages=agent.get_history(),
+                        new_system_prompt=content
                     )
+
+                    agent.set_history(messages=messages)
+
                     continue
 
                 else:
-                    print("(no content)")
+                    LOGGER.warning("No content found. Continuing...")
                     continue
 
             elif cmd == "/history":
@@ -142,7 +146,7 @@ def main(api_base, api_key, model, temperature, max_tokens, num_ctx, max_num_pap
                 )
                 continue
             else:
-                print("Unknown command. Type /help.")
+                LOGGER.warning("Unknown command. Type /help.")
                 continue
         else:
             # Regular single-line user message
@@ -171,6 +175,7 @@ def main(api_base, api_key, model, temperature, max_tokens, num_ctx, max_num_pap
             LOGGER.error(f"Agent encountered an error: {e}")
             print("Error from agent:", e)
             # keep going
+
 
 if __name__ == "__main__":
     main()

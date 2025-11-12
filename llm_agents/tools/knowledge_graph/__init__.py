@@ -4,7 +4,7 @@ The idea is to put the actual functions into wrappers that provide LLM-friendly 
 """
 import random
 
-from toon import encode as toon_encode
+from toon_format import encode as toon_encode
 from typing import List, Optional
 
 from llm_agents.tools.knowledge_graph.retriever import Neo4jGraphWorker
