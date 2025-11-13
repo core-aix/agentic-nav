@@ -1,32 +1,16 @@
-version: '3.8'
-
-
 services:
-  webinterface:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: llm-agents-web
-    ports:
-      - "7860:7860"
-    environment:
-      - PYTHONUNBUFFERED=1
-      - OLLAMA_API_KEY=${OLLAMA_API_KEY}
-      # Example environment variables (uncomment and modify as needed):
-      # - OLLAMA_API_KEY=${OLLAMA_API_KEY}
-      # - DATABASE_URL=sqlite:///app/database/app.db
-      # TODO: MAKE COMMANDLINE ARGS CONTROLLABLE VIA ENV VARIABLES
-    restart: unless-stopped
-
-  neo4j:
+  neo4j_db:
     image: neo4j:5.26.0
     container_name: neo4j_db
+    expose:
+      - "7474"
+      - "7687"
     ports:
       - "7474:7474"  # HTTP
       - "7687:7687"  # Bolt
     environment:
       # Authentication
-      - NEO4J_AUTH=neo4j/llm_agents
+      - NEO4J_AUTH=${NEO4J_USERNAME}/${NEO4J_PASSWORD}
 
       # Memory settings
       - NEO4J_server_memory_heap_initial__size=512m
@@ -45,10 +29,102 @@ services:
       - neo4j_plugins:/plugins
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "cypher-shell -u neo4j -p llm_agents 'RETURN 1'" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+      test: [ "CMD-SHELL", "cypher-shell -u ${NEO4J_USERNAME:-neo4j} -p ${NEO4J_PASSWORD:-llm_agents} 'RETURN 1'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - llm_agents_net
+
+  ollama_embed:
+    image: ollama/ollama:latest
+    container_name: ollama_embed
+    ports:
+      - "11435:11434"
+    volumes:
+      - ~/.ollama:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME}
+    restart: always
+    entrypoint: [ "/bin/bash", "-c", "\
+            ollama serve & \
+            sleep 5 && \
+            ollama pull $EMBEDDING_MODEL_NAME && \
+            wait" ]
+    networks:
+      - llm_agents_net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+
+  ollama_agent:
+    image: ollama/ollama:latest
+    container_name: ollama_agent
+    ports:
+      - "11436:11434"
+    volumes:
+      - ~/.ollama:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - AGENT_MODEL_NAME=${AGENT_MODEL_NAME}
+    restart: always
+    entrypoint: [ "/bin/bash", "-c", "\
+        ollama serve & \
+        sleep 5 && \
+        ollama pull $AGENT_MODEL_NAME && \
+        wait" ]
+    networks:
+      - llm_agents_net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+
+  webinterface:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: llm-agents-web
+    ports:
+      - "7860:7860"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - OLLAMA_API_KEY=${OLLAMA_API_KEY}
+      - NEO4J_URI=bolt://neo4j_db:7687
+      - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-llm_agents}
+      - POPULATE_DATABASE_NIPS2025=false
+      - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME}
+      - EMBEDDING_MODEL_API_BASE=http://ollama_embed:11434
+      - AGENT_MODEL_NAME=${AGENT_MODEL_NAME}
+      - AGENT_MODEL_API_BASE=http://ollama_agent:11434
+    restart: unless-stopped
+    networks:
+      - llm_agents_net
+    depends_on:
+      neo4j_db:
+        condition: service_healthy
+      ollama_embed:
+        condition: service_started
+      ollama_agent:
+        condition: service_started
+
+
+networks:
+  llm_agents_net:
 
 
 volumes:

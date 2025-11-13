@@ -1,3 +1,5 @@
+import logging
+
 import litellm
 import numpy as np
 
@@ -7,15 +9,18 @@ from tqdm import tqdm
 from typing import List
 
 
+LOGGER = logging.getLogger(__name__)
+
+
 def batch_embed_documents(
     texts: List[str],
     batch_size: int = 1,
-    embedding_model: str = "ollama/nomic-embed-text",
-    api_base: str = "http://localhost:11434"
+    embedding_model: str = f"ollama/nomic-embed-text",
+    api_base: str = "http://localhost:11435"
 ) -> np.ndarray:
 
     if None in texts:
-        print(f"WARNING: Detected documents with 'None' values. Replacing 'None' with an empty string...")
+        LOGGER.warning(f"WARNING: Detected documents with 'None' values. Replacing 'None' with an empty string...")
         texts = ['' if doc is None else doc for doc in texts]
 
     vecs: List[List[float]] = []
@@ -29,7 +34,7 @@ def batch_embed_documents(
                 **{"num_ctx": 2048}
             )
         except Exception as e:
-            print(f"Error during embedding batch {i}-{i + batch_size}: {e}. Falling back to single sample processing")
+            LOGGER.error(f"Error during embedding batch {i}-{i + batch_size}: {e}. Falling back to single sample processing")
             resp = []
             ctr = i
             for sample in chunk:
@@ -43,9 +48,9 @@ def batch_embed_documents(
                         )
                     )
                 except litellm.BadRequestError:
-                    print(f"Encountered error processing paper #{ctr}. Please inspect and retry afterwards.")
+                    LOGGER.error(f"Encountered error processing paper #{ctr}. Please inspect and retry afterwards.")
 
-            print(f"RESP: {resp}")
+            LOGGER.debug(f"Single sample response from embedding model: {resp}")
 
         vecs.extend([d["embedding"] for d in resp["data"]])
         # time.sleep(5)  # avoid rate limit

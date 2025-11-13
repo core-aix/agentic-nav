@@ -1,4 +1,5 @@
 import json
+
 import litellm
 import logging
 
@@ -15,8 +16,8 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class LLMAgent:
-    model: str = None,
-    api_base: str = None,
+    model: str = f"ollama_chat/gpt-oss:20b",
+    api_base: str = "http://localhost:11434",
     api_key: str = None,
     llm_args: dict = field(default_factory=lambda: {"temperature": 0.2, "max_tokens": 6000, "num_ctx": 131072}),
     tools: List[callable] = field(default_factory=lambda: get_all_tools())
@@ -59,7 +60,12 @@ class LLMAgent:
 
         self.messages.append(message)
         for _ in range(self.max_interaction_rounds):
-            collected, calls = self._send_to_llm(messages=self.messages)
+            collected, calls = self._send_to_llm(
+                messages=self.messages,
+                model=self.model,
+                api_base=self.api_base,
+                api_key=self.api_key
+            )
             # append the assembled assistant message so tool execution sees the assistant's follow-up
             self.messages.append({"role": "assistant", "content": collected, "_ts": str(datetime.now(UTC))})
             LOGGER.debug(f"Agent response: {collected}")
@@ -94,37 +100,115 @@ class LLMAgent:
         assert self.tool_registry is not None, "Make sure to call 'setup_agent()' before the first interaction."
         assert self.tool_descriptions is not None, "Make sure to call 'setup_agent()' before the first interaction."
 
-        # Do a sanity check for all messages
+        # Sanity check for all messages
         for message in messages:
             if "_ts" not in message.keys():
                 message["_ts"] = str(datetime.now(UTC))
 
-        for _ in range(self.max_interaction_rounds):
-            collected, calls = self._send_to_llm(
-                messages=messages,
-                model=model,
-                api_base=api_base,
-                api_key=api_key,
-                llm_args=llm_args
+        for round_num in range(self.max_interaction_rounds):
+            # Stream the LLM response
+            collected = ""
+            calls = []
+
+            # Create initial assistant message
+            assistant_msg_idx = len(messages)
+            messages.append({"role": "assistant", "content": "", "_ts": str(datetime.now(UTC))})
+
+            stream_iter = litellm.completion(
+                model=model if model is not None else self.model,
+                messages=messages[:assistant_msg_idx],  # Don't include the empty assistant message
+                tools=self.tool_descriptions,
+                tool_choice="auto",
+                api_base=api_base if api_base is not None else self.api_base,
+                api_key=api_key if api_key is not None else self.api_key,
+                stream=True,
+                **llm_args if llm_args is not None else self.llm_args,
             )
-            messages.append({"role": "assistant", "content": collected, "_ts": str(datetime.now(UTC))})
+
+            for chunk in stream_iter:
+                choices = chunk.get("choices", []) or []
+                if not choices:
+                    continue
+                choice = choices[0]
+
+                # Extract content from chunk
+                content = None
+                delta = choice.get("delta")
+
+                if delta and "content" in delta:
+                    content = delta["content"]
+                elif delta and "message" in delta and isinstance(delta["message"], dict):
+                    content = delta["message"].get("content")
+
+                if delta and "tool_calls" in delta:
+                    calls.extend(delta["tool_calls"] or [])
+
+                if content is None:
+                    msg = choice.get("message")
+                    if isinstance(msg, dict):
+                        content = msg.get("content")
+
+                if content is None:
+                    content = choice.get("text")
+
+                if content:
+                    if not isinstance(content, str):
+                        try:
+                            content = json.dumps(content, ensure_ascii=False)
+                        except Exception:
+                            content = str(content)
+
+                    collected += content
+                    # Update the assistant message with accumulated content
+                    messages[assistant_msg_idx]["content"] = collected
+
+                    # Yield the updated messages for streaming display
+                    yield messages.copy()
+
+            # After streaming is complete, update with final content
+            messages[assistant_msg_idx]["content"] = collected
             LOGGER.debug(f"Agent response: {collected}")
 
             if not calls:
-                return messages
+                yield messages
+                return
             else:
-                messages[-1]["tool_calls"] = calls
+                messages[assistant_msg_idx]["tool_calls"] = calls
                 LOGGER.debug(f"Agent requested tool calls: {calls}")
+                yield messages.copy()
 
-            # execute tools and append results
+            # Execute tools and append results
             for call in calls:
-                messages.append(
-                    self.call_tool(
-                        tool_call=call
-                    )
-                )
+                messages.append(self.call_tool(tool_call=call))
+                yield messages.copy()
 
-        return messages
+        yield messages
+        # for _ in range(self.max_interaction_rounds):
+        #     collected, calls = self._send_to_llm(
+        #         messages=messages,
+        #         model=model,
+        #         api_base=api_base,
+        #         api_key=api_key,
+        #         llm_args=llm_args
+        #     )
+        #     messages.append({"role": "assistant", "content": collected, "_ts": str(datetime.now(UTC))})
+        #     LOGGER.debug(f"Agent response: {collected}")
+        #
+        #     if not calls:
+        #         return messages
+        #     else:
+        #         messages[-1]["tool_calls"] = calls
+        #         LOGGER.debug(f"Agent requested tool calls: {calls}")
+        #
+        #     # execute tools and append results
+        #     for call in calls:
+        #         messages.append(
+        #             self.call_tool(
+        #                 tool_call=call
+        #             )
+        #         )
+        #
+        # return messages
 
     def _send_to_llm(
         self,

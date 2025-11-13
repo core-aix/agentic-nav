@@ -2,6 +2,9 @@
 Neo4j exporter for PaperKnowledgeGraph
 Exports NetworkX graph to Neo4j database with proper handling of embeddings and relationships
 """
+import logging
+import os
+
 import click
 import networkx as nx
 from neo4j import GraphDatabase
@@ -15,7 +18,10 @@ try:
 except ImportError:
     from file_handler import load_graph
 
+LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+NEO4J_USERNAME = os.environ.get("NEO4J_USERNAME", "neo4j")
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD")
 
 
 class Neo4jImporter:
@@ -24,13 +30,13 @@ class Neo4jImporter:
     def __init__(
             self,
             uri: str = "bolt://localhost:7687",
-            username: str = "neo4j",
-            password: str = "password"
+            username: str = NEO4J_USERNAME,
+            password: str = NEO4J_PASSWORD
     ):
         """Initialize Neo4j connection."""
         self.driver = GraphDatabase.driver(uri, auth=(username, password))
         self.driver.verify_connectivity()
-        print(f"Connected to Neo4j at {uri}")
+        LOGGER.info(f"Connected to Neo4j at {uri}")
 
     def close(self):
         """Close the Neo4j driver connection."""
@@ -40,7 +46,7 @@ class Neo4jImporter:
         """Clear all nodes and relationships from the database."""
         with self.driver.session() as session:
             session.run("MATCH (n) DETACH DELETE n")
-            print("✅ Cleared existing database")
+            LOGGER.info("Cleared existing database")
 
     def create_indexes(self, embedding_dimension: int = 768):
         """Create indexes for better query performance, including vector index."""
@@ -70,19 +76,19 @@ class Neo4jImporter:
                         }
                     }
                 """, dimension=embedding_dimension)
-                print(f"✅ Created vector index for {embedding_dimension}-dimensional embeddings")
+                LOGGER.info(f"Created vector index for {embedding_dimension}-dimensional embeddings")
             except Exception as e:
-                print(f"⚠️  Warning: Could not create vector index: {e}")
-                print("   Vector indexes require Neo4j 5.11+ or Enterprise Edition")
+                LOGGER.warning(f"Warning: Could not create vector index: {e}")
+                LOGGER.warning("Vector indexes require Neo4j 5.11+ or Enterprise Edition")
 
-            print("✅ Created standard indexes")
+            LOGGER.info("Created standard indexes")
 
     def _export_paper_nodes(self, kg: nx.Graph, batch_size: int):
         """Export paper nodes to Neo4j."""
         paper_nodes = [(n, d) for n, d in kg.nodes(data=True)
                        if d.get('node_type') == 'paper']
 
-        print(f"\nExporting {len(paper_nodes)} paper nodes...")
+        LOGGER.info(f"\nExporting {len(paper_nodes)} paper nodes...")
 
         with self.driver.session() as session:
             for i in tqdm(range(0, len(paper_nodes), batch_size), desc="Paper nodes"):
@@ -116,7 +122,7 @@ class Neo4jImporter:
                     })
                 """, papers=papers_data)
 
-        print(f"✅ Exported {len(paper_nodes)} paper nodes")
+        LOGGER.info(f"Exported {len(paper_nodes)} paper nodes")
 
     def _export_topic_hierarchy(self, kg: nx.Graph):
         """
@@ -131,7 +137,7 @@ class Neo4jImporter:
                 if topic:
                     topic_paths.add(topic)
 
-        print(f"\nProcessing {len(topic_paths)} unique topic paths...")
+        LOGGER.info(f"Processing {len(topic_paths)} unique topic paths...")
 
         # Parse topic paths and create hierarchy
         all_topics = set()
@@ -151,8 +157,10 @@ class Neo4jImporter:
                     'child': parts[i + 1]
                 })
 
-        print(
-            f"Creating {len(all_topics)} topic nodes with {len(set(tuple(r.items()) for r in topic_relationships))} hierarchical relationships...")
+        LOGGER.info(
+            f"Creating {len(all_topics)} topic nodes with {len(set(tuple(r.items()) for r in topic_relationships))} "
+            f"hierarchical relationships..."
+        )
 
         with self.driver.session() as session:
             # Create all topic nodes (using MERGE to avoid duplicates)
@@ -173,7 +181,7 @@ class Neo4jImporter:
                     MERGE (child)-[:SUBTOPIC_OF]->(parent)
                 """, rels=unique_rels)
 
-        print(f"✅ Exported {len(all_topics)} topic nodes with hierarchy")
+        LOGGER.info(f"Exported {len(all_topics)} topic nodes with hierarchy")
 
     def _connect_papers_to_topics(self, kg: nx.Graph, batch_size: int):
         """
@@ -196,7 +204,7 @@ class Neo4jImporter:
                         'full_path': topic  # Store full path as property
                     })
 
-        print(f"\nConnecting {len(paper_topic_connections)} papers to topics...")
+        LOGGER.info(f"Connecting {len(paper_topic_connections)} papers to topics...")
 
         with self.driver.session() as session:
             for i in tqdm(range(0, len(paper_topic_connections), batch_size),
@@ -211,7 +219,7 @@ class Neo4jImporter:
                     SET r.full_path = conn.full_path
                 """, connections=batch)
 
-        print(f"✅ Connected papers to leaf topics")
+        LOGGER.info(f"Connected papers to leaf topics")
 
     def _export_similarity_relationships(self, kg: nx.Graph, batch_size: int):
         """Export similarity relationships between papers to Neo4j."""
@@ -222,7 +230,7 @@ class Neo4jImporter:
             if data.get('relationship') == 'similar_to'
         ]
 
-        print(f"\nExporting {len(similarity_edges)} similarity relationships...")
+        LOGGER.info(f"Exporting {len(similarity_edges)} similarity relationships...")
 
         with self.driver.session() as session:
             for i in tqdm(range(0, len(similarity_edges), batch_size),
@@ -242,7 +250,7 @@ class Neo4jImporter:
                     MERGE (p1)-[:SIMILAR_TO {similarity: edge.similarity}]->(p2)
                 """, edges=edges_data)
 
-        print(f"✅ Exported {len(similarity_edges)} similarity relationships")
+        LOGGER.info(f"Exported {len(similarity_edges)} similarity relationships")
 
     def _export_authors_and_relationships(self, kg: nx.Graph, batch_size: int):
         """
@@ -274,7 +282,7 @@ class Neo4jImporter:
                                 'author_id': author_id
                             })
 
-        print(f"\nExporting {len(all_authors)} unique authors...")
+        LOGGER.info(f"Exporting {len(all_authors)} unique authors...")
 
         with self.driver.session() as session:
             # Create author nodes in batches
@@ -295,10 +303,10 @@ class Neo4jImporter:
                         a.url = author.url
                 """, authors=batch)
 
-        print(f"✅ Exported {len(all_authors)} author nodes")
+        LOGGER.info(f"Exported {len(all_authors)} author nodes")
 
         # Create paper-author relationships in batches
-        print(f"\nCreating {len(paper_author_relationships)} paper-author relationships...")
+        LOGGER.info(f"Creating {len(paper_author_relationships)} paper-author relationships...")
 
         with self.driver.session() as session:
             for i in tqdm(range(0, len(paper_author_relationships), batch_size),
@@ -312,14 +320,14 @@ class Neo4jImporter:
                     MERGE (p)-[:AUTHORED_BY]->(a)
                 """, rels=batch)
 
-        print(f"✅ Created {len(paper_author_relationships)} paper-author relationships")
+        LOGGER.info(f"Created {len(paper_author_relationships)} paper-author relationships")
 
     def export_graph(self, kg_path: str, batch_size: int = 100, embedding_dimension: int = 768):
         """Export the entire knowledge graph to Neo4j."""
-        print(f"Loading graph from path {kg_path}")
+        LOGGER.info(f"Loading graph from path {kg_path}")
         kg = load_graph(kg_path)
 
-        print("\n🚀 Starting Neo4j export...")
+        LOGGER.info("Starting Neo4j export...")
 
         # Clear and prepare database
         self.clear_database()
@@ -340,7 +348,7 @@ class Neo4jImporter:
         # Export similarity relationships
         self._export_similarity_relationships(kg, batch_size)
 
-        print("\n✅ Export completed successfully!")
+        LOGGER.info("Export completed successfully!")
 
     def verify_export(self) -> Dict[str, Any]:
         """Verify the export by checking node and relationship counts."""
@@ -383,9 +391,9 @@ class Neo4jImporter:
                 'authored_by_relationships': authored_by_count
             }
 
-            print("\n📊 Neo4j Database Statistics:")
+            LOGGER.info("Neo4j Database Statistics:")
             for key, value in stats.items():
-                print(f"   {key}: {value}")
+                LOGGER.info(f"   {key}: {value}")
 
             return stats
 
