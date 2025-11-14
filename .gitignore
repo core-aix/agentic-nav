@@ -211,3 +211,5 @@ __marimo__/
 data/*.json
 .vscode/
 rag_index_json/
+*.pkl
+*.json

@@ -2,12 +2,18 @@
 This file defines the tools that can be made available to an agent.
 The idea is to put the actual functions into wrappers that provide LLM-friendly and token efficient outputs.
 """
+import os
 import random
 
-from toon import encode as toon_encode
+from toon_format import encode as toon_encode
 from typing import List, Optional
 
 from llm_agents.tools.knowledge_graph.retriever import Neo4jGraphWorker
+
+
+NEO4J_DATABASE_URI = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USERNAME = os.environ.get("NEO4J_USERNAME", "neo4j")
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD")
 
 
 def search_similar_papers(
@@ -71,9 +77,9 @@ def search_similar_papers(
         ... )
     """
     worker = Neo4jGraphWorker(
-        uri="bolt://localhost:7687",
-        username="neo4j",
-        password="llm_agents"
+        uri=NEO4J_DATABASE_URI,
+        username=NEO4J_USERNAME,
+        password=NEO4J_PASSWORD
     )
 
     # Fetch papers
@@ -159,9 +165,9 @@ def find_neighboring_papers(
         relationship_types = [relationship_types]
 
     worker = Neo4jGraphWorker(
-        uri="bolt://localhost:7687",
-        username="neo4j",
-        password="llm_agents"
+        uri=NEO4J_DATABASE_URI,
+        username=NEO4J_USERNAME,
+        password=NEO4J_PASSWORD
     )
 
     neighbors = worker.neighborhood_search(
@@ -243,16 +249,10 @@ def traverse_graph(
         ...     strategy="breadth_first_random"
         ... )
     """
-
-    print(f"PAPER ID: {start_paper_id}")
-
-    if type(relationship_types) is str:
-        relationship_types = [relationship_types]
-
     worker = Neo4jGraphWorker(
-        uri="bolt://localhost:7687",
-        username="neo4j",
-        password="llm_agents"
+        uri=NEO4J_DATABASE_URI,
+        username=NEO4J_USERNAME,
+        password=NEO4J_PASSWORD
     )
 
     papers = worker.graph_traversal(

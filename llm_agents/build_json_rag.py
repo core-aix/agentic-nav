@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from typing import List
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -12,12 +13,12 @@ from tqdm import tqdm
 
 from llm_agents.utils import batch_embed_documents
 
-API_BASE = "http://localhost:11434"
-EMBED_MODEL = "ollama/nomic-embed-text"   # pull with: ollama pull nomic-embed-text
+OLLAMA_LOCAL_EMBEDDING_MODEL_NAME = os.environ.get("OLLAMA_LOCAL_EMBEDDING_MODEL", "nomic-embed-text")
+OLLAMA_LOCAL_EMBEDDING_MODEL_API_BASE = os.environ.get("OLLAMA_LOCAL_EMBEDDING_MODEL_API_BASE", "http://localhost:11434")
 INDEX_DIR = "../rag_index_json"
 
 
-def _load_papers(json_path: str) -> List[Paper]:
+def _load_papers(json_path: str) -> List:
     data = json.loads(Path(json_path).read_text())
     papers = data["results"]
     return papers
@@ -30,7 +31,11 @@ def _embed(texts: List[str], batch: int = 1) -> np.ndarray:
         max_retries = 100
         while retry < max_retries:
             try:
-                resp = embedding(model=EMBED_MODEL, input=chunk, api_base=API_BASE)
+                resp = embedding(
+                    model=OLLAMA_LOCAL_EMBEDDING_MODEL_NAME,
+                    input=chunk,
+                    api_base=OLLAMA_LOCAL_EMBEDDING_MODEL_API_BASE
+                )
                 break
             except Exception as e:
                 print(f"Error during embedding batch {i}-{i+batch}: {e}")
@@ -55,8 +60,8 @@ def build_index(json_path: str, out_dir: str = INDEX_DIR) -> None:
     texts = [f"{p['name']}\n\n{p['abstract']}" if "name" in p and "abstract" in p else "" for p in papers]
     X = batch_embed_documents(
         texts,
-        embedding_model=EMBED_MODEL,
-        api_base=API_BASE,
+        embedding_model=OLLAMA_LOCAL_EMBEDDING_MODEL_NAME,
+        api_base=OLLAMA_LOCAL_EMBEDDING_MODEL_API_BASE,
         batch_size=32
     )
     dim = X.shape[1]

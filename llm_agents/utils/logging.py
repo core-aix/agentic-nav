@@ -1,6 +1,9 @@
 import logging
 import logging.handlers
+
+from datetime import datetime
 from pathlib import Path
+
 
 
 def setup_logging(log_dir: str = "logs", level: str = "INFO"):
@@ -15,19 +18,22 @@ def setup_logging(log_dir: str = "logs", level: str = "INFO"):
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
     console_format = logging.Formatter(
-        '%(levelname)s - %(name)s - %(message)s'
+        "%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
     )
     console_handler.setFormatter(console_format)
 
     # File handler - for production
+    time_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
+
     file_handler = logging.handlers.RotatingFileHandler(
-        f"{log_dir}/llm_agents.log",
+        f"{log_dir}/{time_now}_llm_agents.log",
         maxBytes=10 * 1024 * 1024,  # 10MB
         backupCount=5
     )
     file_handler.setLevel(logging.DEBUG)
     file_format = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s'
+        "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
     )
     file_handler.setFormatter(file_format)
 

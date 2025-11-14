@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 import random
+import os
 
 from neo4j import GraphDatabase
 from pathlib import Path
@@ -19,6 +20,8 @@ from llm_agents.utils.embedding_generator import batch_embed_documents
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 LOGGER = logging.getLogger(__name__)
+EMBEDDING_MODEL_NAME = os.environ.get("EMBEDDING_MODEL_NAME", "nomic-embed-text")
+EMBEDDING_MODEL_API_BASE = os.environ.get("EMBEDDING_MODEL_API_BASE", "http://localhost:11435")
 
 
 class Neo4jGraphWorker:
@@ -113,7 +116,7 @@ class Neo4jGraphWorker:
         """Initialize Neo4j connection."""
         self.driver = GraphDatabase.driver(uri, auth=(username, password))
         self.driver.verify_connectivity()
-        print(f"Connected to Neo4j at {uri}")
+        LOGGER.info(f"Connected to Neo4j at {uri}")
 
     def close(self):
         """Close the Neo4j driver connection."""
@@ -122,8 +125,8 @@ class Neo4jGraphWorker:
     @staticmethod
     def embed_user_query(
         text: str,
-        embedding_model: str = "ollama/nomic-embed-text",
-        api_base: str = "http://localhost:11434"
+        embedding_model: str = f"ollama/{EMBEDDING_MODEL_NAME}",
+        api_base: str = EMBEDDING_MODEL_API_BASE
     ):
         emb = batch_embed_documents(
             texts=[text],
@@ -144,7 +147,7 @@ class Neo4jGraphWorker:
         Perform vector similarity search on paper embeddings.
 
         Args:
-            query_embedding: Query embedding vector (numpy array or list)
+            user_query: User query (str)
             top_k: Number of top results to return
             min_similarity: Optional minimum similarity threshold (0-1)
 
@@ -311,52 +314,6 @@ class Neo4jGraphWorker:
                 max_branches or 3
             )
 
-    # def graph_traversal(
-    #     self,
-    #     start_paper_id: str,
-    #     n_hops: int = 2,
-    #     relationship_types: Optional[List[str]] = None,
-    #     max_results: Optional[int] = None
-    # ) -> List[Dict[str, Any]]:
-    #     """
-    #     Traverse the graph for n hops from starting paper nodes.
-    #
-    #     Args:
-    #         start_paper_id: Paper ID to start traversal from
-    #         n_hops: Number of hops to traverse (1-5 recommended)
-    #         relationship_types: Optional list of relationship types to traverse
-    #         max_results: Optional maximum number of results to return
-    #
-    #     Returns:
-    #         List of papers found through traversal with distance information
-    #     """
-    #     with self.driver.session() as session:
-    #         # Build relationship type filter
-    #         if relationship_types:
-    #             rel_filter = f":{':'.join(relationship_types)}"
-    #         else:
-    #             rel_filter = ""
-    #
-    #         query = self._DB_GRAPH_TRAVERSAL_QUERY(rel_filter=rel_filter, n_hops=n_hops)
-    #
-    #         if max_results:
-    #             query += f" LIMIT {max_results}"
-    #
-    #         result = session.run(query, start_paper_ids=[start_paper_id])
-    #
-    #         papers = []
-    #         for record in result:
-    #             paper = {
-    #                 'id': record['id'],
-    #                 'name': record['name'],
-    #                 'abstract': record['abstract'],
-    #                 'topic': record['topic'],
-    #                 'distance': record['distance']
-    #             }
-    #             papers.append(paper)
-    #
-    #         return papers
-
     def combined_search_workflow(
             self,
             user_query: str,
@@ -379,7 +336,7 @@ class Neo4jGraphWorker:
             Dictionary containing all search results
         """
         # Step 1: Similarity search
-        print(f"🔍 Finding {top_k} most similar papers...")
+        LOGGER.info(f"Finding {top_k} most similar papers...")
         similar_papers = self.similarity_search(user_query, top_k)
 
         if not similar_papers:
@@ -399,11 +356,11 @@ class Neo4jGraphWorker:
         # Step 2: Neighborhood search (optional)
         neighborhood = {}
         if include_neighborhood:
-            print(f"🔍 Finding immediate neighbors...")
+            LOGGER.info(f"Finding immediate neighbors...")
             neighborhood = self.neighborhood_search(paper_ids, relationship_types)
 
         # Step 3: Graph traversal
-        print(f"🔍 Traversing graph with {n_hops} hops...")
+        LOGGER.info(f"Traversing graph with {n_hops} hops...")
         related_papers = self.graph_traversal(
             paper_ids,
             n_hops,
@@ -418,7 +375,7 @@ class Neo4jGraphWorker:
             'unique_papers_found': len(set([p['id'] for p in similar_papers + related_papers]))
         }
 
-        print(f"\n✅ Search complete: {summary}")
+        LOGGER.debug(f"Search complete: {summary}")
 
         return {
             'similar_papers': similar_papers,
@@ -587,6 +544,12 @@ class Neo4jGraphWorker:
                 'collaborators': collaborations,
                 'total_collaborators': len(collaborations)
             }
+
+    def find_posters_by_session(self):
+        # TODO: Import metadata into the graph
+        # TODO: Create a tool to plan the visit schedule for a single poster session.
+        # TODO: Tool design: Have a tool to filter by poster session and topic. Write it manually for now.
+        pass
 
 
 # Test

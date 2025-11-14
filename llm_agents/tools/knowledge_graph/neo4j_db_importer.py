@@ -2,6 +2,9 @@
 Neo4j exporter for PaperKnowledgeGraph
 Exports NetworkX graph to Neo4j database with proper handling of embeddings and relationships
 """
+import logging
+import os
+
 import click
 import networkx as nx
 from neo4j import GraphDatabase
@@ -10,12 +13,19 @@ import numpy as np
 from tqdm import tqdm
 from pathlib import Path
 
-try:
-    from .file_handler import load_graph
-except ImportError:
-    from file_handler import load_graph
+from llm_agents.tools.knowledge_graph.file_handler import load_graph
+from llm_agents.utils.logging import setup_logging
 
+
+# Setup logging
+setup_logging(
+    log_dir="logs",
+    level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "INFO")
+)
+LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+NEO4J_USERNAME = os.environ.get("NEO4J_USERNAME", "neo4j")
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD")
 
 
 class Neo4jImporter:
@@ -24,13 +34,13 @@ class Neo4jImporter:
     def __init__(
             self,
             uri: str = "bolt://localhost:7687",
-            username: str = "neo4j",
-            password: str = "password"
+            username: str = NEO4J_USERNAME,
+            password: str = NEO4J_PASSWORD
     ):
         """Initialize Neo4j connection."""
         self.driver = GraphDatabase.driver(uri, auth=(username, password))
         self.driver.verify_connectivity()
-        print(f"Connected to Neo4j at {uri}")
+        LOGGER.info(f"Connected to Neo4j at {uri}")
 
     def close(self):
         """Close the Neo4j driver connection."""
@@ -40,7 +50,7 @@ class Neo4jImporter:
         """Clear all nodes and relationships from the database."""
         with self.driver.session() as session:
             session.run("MATCH (n) DETACH DELETE n")
-            print("✅ Cleared existing database")
+            LOGGER.info("Cleared existing database")
 
     def create_indexes(self, embedding_dimension: int = 768):
         """Create indexes for better query performance, including vector index."""
@@ -52,7 +62,7 @@ class Neo4jImporter:
             session.run("CREATE INDEX topic_name IF NOT EXISTS FOR (t:Topic) ON (t.name)")
 
             # Create index on author IDs
-            session.run("CREATE INDEX author_id IF NOT EXISTS FOR (a:Author) ON (a.id)")
+            session.run("CREATE INDEX author_id IF NOT EXISTS FOR (a:Author) ON (a.author_id)")
 
             # Create index on author names (useful for searching)
             session.run("CREATE INDEX author_name IF NOT EXISTS FOR (a:Author) ON (a.fullname)")
@@ -70,19 +80,19 @@ class Neo4jImporter:
                         }
                     }
                 """, dimension=embedding_dimension)
-                print(f"✅ Created vector index for {embedding_dimension}-dimensional embeddings")
+                LOGGER.info(f"Created vector index for {embedding_dimension}-dimensional embeddings")
             except Exception as e:
-                print(f"⚠️  Warning: Could not create vector index: {e}")
-                print("   Vector indexes require Neo4j 5.11+ or Enterprise Edition")
+                LOGGER.warning(f"Warning: Could not create vector index: {e}")
+                LOGGER.warning("Vector indexes require Neo4j 5.11+ or Enterprise Edition")
 
-            print("✅ Created standard indexes")
+            LOGGER.info("Created standard indexes")
 
     def _export_paper_nodes(self, kg: nx.Graph, batch_size: int):
-        """Export paper nodes to Neo4j."""
+        """Export paper nodes to Neo4j with all attributes."""
         paper_nodes = [(n, d) for n, d in kg.nodes(data=True)
                        if d.get('node_type') == 'paper']
 
-        print(f"\nExporting {len(paper_nodes)} paper nodes...")
+        LOGGER.info(f"\nExporting {len(paper_nodes)} paper nodes...")
 
         with self.driver.session() as session:
             for i in tqdm(range(0, len(paper_nodes), batch_size), desc="Paper nodes"):
@@ -100,6 +110,15 @@ class Neo4jImporter:
                         'name': data.get('name', ''),
                         'abstract': data.get('abstract', ''),
                         'topic': data.get('topic', ''),
+                        'keywords': data.get('keywords', []),
+                        'decision': data.get('decision', ''),
+                        'session': data.get('session', ''),
+                        'session_start_time': data.get('session_start_time', ''),
+                        'session_end_time': data.get('session_end_time', ''),
+                        'presentation_type': data.get('presentation_type', ''),
+                        'room_name': data.get('room_name', ''),
+                        'project_url': data.get('project_url', ''),
+                        'poster_position': data.get('poster_position', ''),
                         'embedding': embedding
                     }
                     papers_data.append(paper_dict)
@@ -112,11 +131,20 @@ class Neo4jImporter:
                         name: paper.name,
                         abstract: paper.abstract,
                         topic: paper.topic,
+                        keywords: paper.keywords,
+                        decision: paper.decision,
+                        session: paper.session,
+                        session_start_time: paper.session_start_time,
+                        session_end_time: paper.session_end_time,
+                        presentation_type: paper.presentation_type,
+                        room_name: paper.room_name,
+                        project_url: paper.project_url,
+                        poster_position: paper.poster_position,
                         embedding: paper.embedding
                     })
                 """, papers=papers_data)
 
-        print(f"✅ Exported {len(paper_nodes)} paper nodes")
+        LOGGER.info(f"Exported {len(paper_nodes)} paper nodes")
 
     def _export_topic_hierarchy(self, kg: nx.Graph):
         """
@@ -131,7 +159,7 @@ class Neo4jImporter:
                 if topic:
                     topic_paths.add(topic)
 
-        print(f"\nProcessing {len(topic_paths)} unique topic paths...")
+        LOGGER.info(f"Processing {len(topic_paths)} unique topic paths...")
 
         # Parse topic paths and create hierarchy
         all_topics = set()
@@ -151,8 +179,10 @@ class Neo4jImporter:
                     'child': parts[i + 1]
                 })
 
-        print(
-            f"Creating {len(all_topics)} topic nodes with {len(set(tuple(r.items()) for r in topic_relationships))} hierarchical relationships...")
+        LOGGER.info(
+            f"Creating {len(all_topics)} topic nodes with {len(set(tuple(r.items()) for r in topic_relationships))} "
+            f"hierarchical relationships..."
+        )
 
         with self.driver.session() as session:
             # Create all topic nodes (using MERGE to avoid duplicates)
@@ -173,7 +203,7 @@ class Neo4jImporter:
                     MERGE (child)-[:SUBTOPIC_OF]->(parent)
                 """, rels=unique_rels)
 
-        print(f"✅ Exported {len(all_topics)} topic nodes with hierarchy")
+        LOGGER.info(f"Exported {len(all_topics)} topic nodes with hierarchy")
 
     def _connect_papers_to_topics(self, kg: nx.Graph, batch_size: int):
         """
@@ -196,7 +226,7 @@ class Neo4jImporter:
                         'full_path': topic  # Store full path as property
                     })
 
-        print(f"\nConnecting {len(paper_topic_connections)} papers to topics...")
+        LOGGER.info(f"Connecting {len(paper_topic_connections)} papers to topics...")
 
         with self.driver.session() as session:
             for i in tqdm(range(0, len(paper_topic_connections), batch_size),
@@ -211,7 +241,7 @@ class Neo4jImporter:
                     SET r.full_path = conn.full_path
                 """, connections=batch)
 
-        print(f"✅ Connected papers to leaf topics")
+        LOGGER.info(f"Connected papers to leaf topics")
 
     def _export_similarity_relationships(self, kg: nx.Graph, batch_size: int):
         """Export similarity relationships between papers to Neo4j."""
@@ -222,7 +252,7 @@ class Neo4jImporter:
             if data.get('relationship') == 'similar_to'
         ]
 
-        print(f"\nExporting {len(similarity_edges)} similarity relationships...")
+        LOGGER.info(f"Exporting {len(similarity_edges)} similarity relationships...")
 
         with self.driver.session() as session:
             for i in tqdm(range(0, len(similarity_edges), batch_size),
@@ -242,84 +272,138 @@ class Neo4jImporter:
                     MERGE (p1)-[:SIMILAR_TO {similarity: edge.similarity}]->(p2)
                 """, edges=edges_data)
 
-        print(f"✅ Exported {len(similarity_edges)} similarity relationships")
+        LOGGER.info(f"Exported {len(similarity_edges)} similarity relationships")
 
     def _export_authors_and_relationships(self, kg: nx.Graph, batch_size: int):
         """
-        Export author nodes and create AUTHORED_BY relationships between papers and authors.
+        Export author nodes from NetworkX graph (where they already exist as separate nodes)
+        and create IS_AUTHOR_OF relationships between authors and papers.
+
+        Author nodes in NetworkX have composite IDs like "12345 - John Doe"
         """
-        # Collect all unique authors and paper-author relationships
-        all_authors = {}  # Use dict to deduplicate by author ID
-        paper_author_relationships = []
+        # Collect author nodes from the graph
+        author_nodes = [
+            (node_id, data)
+            for node_id, data in kg.nodes(data=True)
+            if data.get('node_type') != 'paper' and data.get('node_type') != 'topic'
+        ]
 
-        for node_id, data in kg.nodes(data=True):
-            if data.get('node_type') == 'paper':
-                authors = data.get('authors', [])
+        LOGGER.info(f"Found {len(author_nodes)} author nodes in graph...")
 
-                if authors and isinstance(authors[0], dict):
-                    for author in authors:
-                        author_id = str(author.get('id', ''))
-                        if author_id and author_id != '':
-                            # Store author info (will deduplicate automatically)
-                            all_authors[author_id] = {
-                                'id': author_id,
-                                'fullname': author.get('fullname', ''),
-                                'institution': author.get('institution', ''),
-                                'url': author.get('url', '')
-                            }
+        # Extract author data
+        all_authors = []
+        for node_id, data in author_nodes:
+            # Parse composite ID "12345 - John Doe"
+            parts = node_id.split(' - ', 1)
+            author_id = parts[0].strip() if len(parts) > 0 else ""
 
-                            # Store paper-author relationship
-                            paper_author_relationships.append({
-                                'paper_id': node_id,
-                                'author_id': author_id
-                            })
+            author_dict = {
+                'composite_id': node_id,  # Store the full composite ID
+                'author_id': author_id,
+                'fullname': data.get('fullname', ''),
+                'institution': data.get('institution', ''),
+                'url': data.get('url', '')
+            }
+            all_authors.append(author_dict)
 
-        print(f"\nExporting {len(all_authors)} unique authors...")
+        LOGGER.info(f"Exporting {len(all_authors)} unique authors...")
 
         with self.driver.session() as session:
             # Create author nodes in batches
-            authors_list = list(all_authors.values())
-            for i in tqdm(range(0, len(authors_list), batch_size), desc="Author nodes"):
-                batch = authors_list[i:i + batch_size]
+            for i in tqdm(range(0, len(all_authors), batch_size), desc="Author nodes"):
+                batch = all_authors[i:i + batch_size]
 
                 session.run("""
                     UNWIND $authors AS author
-                    MERGE (a:Author {id: author.id})
+                    MERGE (a:Author {composite_id: author.composite_id})
                     ON CREATE SET
+                        a.author_id = author.author_id,
                         a.fullname = author.fullname,
                         a.institution = author.institution,
                         a.url = author.url
                     ON MATCH SET
+                        a.author_id = author.author_id,
                         a.fullname = author.fullname,
                         a.institution = author.institution,
                         a.url = author.url
                 """, authors=batch)
 
-        print(f"✅ Exported {len(all_authors)} author nodes")
+        LOGGER.info(f"Exported {len(all_authors)} author nodes")
 
-        # Create paper-author relationships in batches
-        print(f"\nCreating {len(paper_author_relationships)} paper-author relationships...")
+        # Method 1: Try to collect author-paper relationships from graph edges
+        author_paper_edges = [
+            (source, target, data)
+            for source, target, data in kg.edges(data=True)
+            if data.get('relationship') == 'is_author_of'
+        ]
 
-        with self.driver.session() as session:
-            for i in tqdm(range(0, len(paper_author_relationships), batch_size),
-                          desc="Paper-Author relationships"):
-                batch = paper_author_relationships[i:i + batch_size]
+        LOGGER.info(f"Found {len(author_paper_edges)} IS_AUTHOR_OF edges in graph")
 
-                session.run("""
-                    UNWIND $rels AS rel
-                    MATCH (p:Paper {id: rel.paper_id})
-                    MATCH (a:Author {id: rel.author_id})
-                    MERGE (p)-[:AUTHORED_BY]->(a)
-                """, rels=batch)
+        # Method 2: If no edges found, extract from paper node 'authors' attribute
+        if len(author_paper_edges) == 0:
+            LOGGER.warning("No IS_AUTHOR_OF edges found in graph. Extracting from paper 'authors' attribute...")
 
-        print(f"✅ Created {len(paper_author_relationships)} paper-author relationships")
+            paper_author_relationships = []
+            for node_id, data in kg.nodes(data=True):
+                if data.get('node_type') == 'paper':
+                    authors = data.get('authors', [])
+
+                    if authors and isinstance(authors, list) and len(authors) > 0:
+                        # Check if authors are stored as dicts
+                        if isinstance(authors[0], dict):
+                            for author in authors:
+                                author_id = str(author.get('id', ''))
+                                fullname = author.get('fullname', '')
+                                if author_id and fullname:
+                                    composite_id = f"{author_id} - {fullname}"
+                                    paper_author_relationships.append({
+                                        'author_id': composite_id,
+                                        'paper_id': node_id
+                                    })
+
+            LOGGER.info(f"Extracted {len(paper_author_relationships)} relationships from paper attributes")
+
+            # Create relationships from extracted data
+            with self.driver.session() as session:
+                for i in tqdm(range(0, len(paper_author_relationships), batch_size),
+                              desc="Author-Paper relationships"):
+                    batch = paper_author_relationships[i:i + batch_size]
+
+                    session.run("""
+                        UNWIND $edges AS edge
+                        MATCH (a:Author {composite_id: edge.author_id})
+                        MATCH (p:Paper {id: edge.paper_id})
+                        MERGE (a)-[:IS_AUTHOR_OF]->(p)
+                    """, edges=batch)
+
+            LOGGER.info(f"Created {len(paper_author_relationships)} author-paper relationships")
+        else:
+            # Create relationships from graph edges
+            with self.driver.session() as session:
+                for i in tqdm(range(0, len(author_paper_edges), batch_size),
+                              desc="Author-Paper relationships"):
+                    batch = author_paper_edges[i:i + batch_size]
+
+                    edges_data = [{
+                        'author_id': source,  # composite ID like "12345 - John Doe"
+                        'paper_id': target
+                    } for source, target, data in batch]
+
+                    session.run("""
+                        UNWIND $edges AS edge
+                        MATCH (a:Author {composite_id: edge.author_id})
+                        MATCH (p:Paper {id: edge.paper_id})
+                        MERGE (a)-[:IS_AUTHOR_OF]->(p)
+                    """, edges=edges_data)
+
+            LOGGER.info(f"Created {len(author_paper_edges)} author-paper relationships")
 
     def export_graph(self, kg_path: str, batch_size: int = 100, embedding_dimension: int = 768):
         """Export the entire knowledge graph to Neo4j."""
-        print(f"Loading graph from path {kg_path}")
+        LOGGER.info(f"Loading graph from path {kg_path}")
         kg = load_graph(kg_path)
 
-        print("\n🚀 Starting Neo4j export...")
+        LOGGER.info("Starting Neo4j export...")
 
         # Clear and prepare database
         self.clear_database()
@@ -328,7 +412,7 @@ class Neo4jImporter:
         # Export paper nodes
         self._export_paper_nodes(kg, batch_size)
 
-        # Export authors and paper-author relationships
+        # Export authors and author-paper relationships
         self._export_authors_and_relationships(kg, batch_size)
 
         # Export topic hierarchy
@@ -340,7 +424,7 @@ class Neo4jImporter:
         # Export similarity relationships
         self._export_similarity_relationships(kg, batch_size)
 
-        print("\n✅ Export completed successfully!")
+        LOGGER.info("Export completed successfully!")
 
     def verify_export(self) -> Dict[str, Any]:
         """Verify the export by checking node and relationship counts."""
@@ -369,9 +453,9 @@ class Neo4jImporter:
             result = session.run("MATCH ()-[r:SUBTOPIC_OF]->() RETURN count(r) as count")
             subtopic_count = result.single()['count']
 
-            # Count author relationships
-            result = session.run("MATCH ()-[r:AUTHORED_BY]->() RETURN count(r) as count")
-            authored_by_count = result.single()['count']
+            # Count author relationships (updated relationship name)
+            result = session.run("MATCH ()-[r:IS_AUTHOR_OF]->() RETURN count(r) as count")
+            is_author_of_count = result.single()['count']
 
             stats = {
                 'papers': paper_count,
@@ -380,12 +464,12 @@ class Neo4jImporter:
                 'total_relationships': rel_count,
                 'similarity_relationships': similarity_count,
                 'subtopic_relationships': subtopic_count,
-                'authored_by_relationships': authored_by_count
+                'is_author_of_relationships': is_author_of_count
             }
 
-            print("\n📊 Neo4j Database Statistics:")
+            LOGGER.info("Neo4j Database Statistics:")
             for key, value in stats.items():
-                print(f"   {key}: {value}")
+                LOGGER.info(f"   {key}: {value}")
 
             return stats
 
@@ -397,7 +481,7 @@ class Neo4jImporter:
 @click.option("-p", "--neo4j-password", help="Database password")
 @click.option("-b", "--batch-size", help="Batch size for node insertion", default=100)
 @click.option("-e", "--embedding-dimension", help="Vector embedding dimensions", default=768)
-def export_to_neo4j(
+def main(
     graph_path: str,
     neo4j_uri: str = "bolt://localhost:7687",
     neo4j_username: str = "neo4j",
@@ -429,4 +513,4 @@ def export_to_neo4j(
 
 
 if __name__ == "__main__":
-    export_to_neo4j()
+    main()
