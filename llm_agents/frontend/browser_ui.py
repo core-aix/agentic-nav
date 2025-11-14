@@ -38,7 +38,7 @@ OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY", DEFAULT_NEURIPS2025_AGENT_ARGS
 # Setup logging (only needs to be done once globally)
 setup_logging(
     log_dir="logs",
-    level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "DEBUG")
+    level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "INFO")
 )
 
 
