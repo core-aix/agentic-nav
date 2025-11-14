@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Download the pre-built knowledge graph
-wget -O graphs/neurips2025_knowledge_graph.pkl https://syncandshare.lrz.de/dl/fi8dwHGbvtWDNaejVEgc7m/knowledge_graph_thresh_0.6.pkl
+wget -O graphs/neurips2025_knowledge_graph.pkl https://syncandshare.lrz.de/dl/fiERzDh4Kze641JA1Dk8Kv/knowledge_graph_thresh_0.6.pkl
 
 # Import the knowledge graph to the database
 uv run llm_agents/tools/knowledge_graph/neo4j_db_importer.py \

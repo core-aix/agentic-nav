@@ -13,11 +13,15 @@ import numpy as np
 from tqdm import tqdm
 from pathlib import Path
 
-try:
-    from .file_handler import load_graph
-except ImportError:
-    from file_handler import load_graph
+from llm_agents.tools.knowledge_graph.file_handler import load_graph
+from llm_agents.utils.logging import setup_logging
 
+
+# Setup logging
+setup_logging(
+    log_dir="logs",
+    level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "INFO")
+)
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 NEO4J_USERNAME = os.environ.get("NEO4J_USERNAME", "neo4j")
@@ -498,11 +502,11 @@ def main(
     """
     importer = Neo4jImporter(neo4j_uri, neo4j_username, neo4j_password)
     try:
-        importer.export_graph(
-            graph_path,
-            batch_size,
-            embedding_dimension
-        )
+        # importer.export_graph(
+        #     graph_path,
+        #     batch_size,
+        #     embedding_dimension
+        # )
         importer.verify_export()
     finally:
         importer.close()
