@@ -502,11 +502,11 @@ def main(
     """
     importer = Neo4jImporter(neo4j_uri, neo4j_username, neo4j_password)
     try:
-        # importer.export_graph(
-        #     graph_path,
-        #     batch_size,
-        #     embedding_dimension
-        # )
+        importer.export_graph(
+            graph_path,
+            batch_size,
+            embedding_dimension
+        )
         importer.verify_export()
     finally:
         importer.close()
