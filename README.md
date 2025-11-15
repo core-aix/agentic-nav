@@ -173,3 +173,10 @@ At the moment, the web UI only supports Ollama models.
 The agent involves a set of asynchronous operations. We provide a built-in logging instance to capture all relevant logs 
 for debugging. To set the right debugging level for your application, you can use the environment variable `LLM_AGENTS_LOG_LEVEL`. 
 By default, it is set to `INFO`.
+
+#### Running tests
+We try to cover all tools and agent functionalities in thorough unit tests. 
+You can run them via: 
+```commandline
+uv run pytest tests/
+```
