@@ -19,6 +19,9 @@ def batch_embed_documents(
     api_base: str = "http://localhost:11435"
 ) -> np.ndarray:
 
+    if not texts:
+        return np.array([], dtype="float32").reshape(0, 0)
+
     if None in texts:
         LOGGER.warning(f"WARNING: Detected documents with 'None' values. Replacing 'None' with an empty string...")
         texts = ['' if doc is None else doc for doc in texts]
@@ -35,11 +38,11 @@ def batch_embed_documents(
             )
         except Exception as e:
             LOGGER.error(f"Error during embedding batch {i}-{i + batch_size}: {e}. Falling back to single sample processing")
-            resp = []
+            individual_responses = []
             ctr = i
             for sample in chunk:
                 try:
-                    resp.append(
+                    individual_responses.append(
                         embedding(
                             model=embedding_model,
                             input=sample,
@@ -49,10 +52,16 @@ def batch_embed_documents(
                     )
                 except litellm.BadRequestError:
                     LOGGER.error(f"Encountered error processing paper #{ctr}. Please inspect and retry afterwards.")
+                ctr += 1
 
-            LOGGER.debug(f"Single sample response from embedding model: {resp}")
-
-        vecs.extend([d["embedding"] for d in resp["data"]])
+            LOGGER.debug(f"Single sample response from embedding model: {individual_responses}")
+            
+            # Extract embeddings from individual responses
+            for individual_resp in individual_responses:
+                vecs.extend([d["embedding"] for d in individual_resp["data"]])
+        else:
+            # Normal batch processing
+            vecs.extend([d["embedding"] for d in resp["data"]])
         # time.sleep(5)  # avoid rate limit
     arr = np.array(vecs, dtype="float32")
     # cosine similarity: normalize to unit length and use IndexFlatIP

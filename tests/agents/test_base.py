@@ -16,13 +16,16 @@ class TestLLMAgent:
     @pytest.fixture
     def agent(self):
         """Create a test agent instance."""
-        return LLMAgent(
-            model="test-model",
-            api_base="http://test.com",
+        agent = LLMAgent(
+            model="ollama_chat/gpt-oss:20b",
+            api_base="http://localhost:11436",
             api_key="test-key",
             llm_args={"temperature": 0.5},
             global_tool_args={"num_records": 5}
         )
+
+        agent.setup_session()
+        return agent
 
     @pytest.fixture
     def mock_tools(self):
@@ -39,8 +42,8 @@ class TestLLMAgent:
 
     def test_agent_initialization(self, agent):
         """Test agent initialization with default values."""
-        assert agent.model == "test-model"
-        assert agent.api_base == "http://test.com"
+        assert agent.model == "ollama_chat/gpt-oss:20b"
+        assert agent.api_base == "http://localhost:11436"
         assert agent.api_key == "test-key"
         assert agent.llm_args == {"temperature": 0.5}
         assert agent.global_tool_args == {"num_records": 5}
@@ -68,8 +71,8 @@ class TestLLMAgent:
         
         mock_litellm.completion.assert_called_once()
         call_args = mock_litellm.completion.call_args
-        assert call_args.kwargs['model'] == "test-model"
-        assert call_args.kwargs['api_base'] == "http://test.com"
+        assert call_args.kwargs['model'] == "ollama_chat/gpt-oss:20b"
+        assert call_args.kwargs['api_base'] == "http://localhost:11436"
         assert call_args.kwargs['api_key'] == "test-key"
 
     @patch('llm_agents.agents.base.litellm')
@@ -170,7 +173,9 @@ class TestLLMAgent:
             "id": "call_1",
             "function": {
                 "name": "mock_tool_1",
-                "arguments": "invalid json"
+                "arguments": {
+                    "query": "invalid json"
+                }
             }
         }
 
@@ -260,6 +265,21 @@ class TestLLMAgent:
         recent_msg = agent.get_most_recent_assistant_message()
         assert recent_msg is None
 
+    def test_interact_assertions(self, agent):
+        """Test that interact method validates inputs properly."""
+        agent.remove_session()
+        with pytest.raises(AssertionError, match="Make sure to call 'setup_session\\(\\)' before the first interaction."):
+            agent.interact({"role": "user", "content": "test"})
+
+        agent.tool_registry = {}
+        agent.tool_descriptions = []
+
+        with pytest.raises(AssertionError, match="must contain a 'role' key"):
+            agent.interact({"content": "test"})
+
+        with pytest.raises(AssertionError, match="must contain a 'content' key"):
+            agent.interact({"role": "user"})
+
     @patch('llm_agents.agents.base.litellm')
     def test_interact_single_round(self, mock_litellm, agent, mock_tools, sample_message):
         """Test single interaction round without tool calls."""
@@ -316,20 +336,6 @@ class TestLLMAgent:
         assert result_messages[3]["role"] == "assistant"
         assert result_messages[3]["content"] == "Here are the results!"
 
-    def test_interact_assertions(self, agent):
-        """Test that interact method validates inputs properly."""
-        with pytest.raises(AssertionError, match="Make sure to call 'setup_agent'"):
-            agent.interact({"role": "user", "content": "test"})
-        
-        agent.tool_registry = {}
-        agent.tool_descriptions = []
-        
-        with pytest.raises(AssertionError, match="must contain a 'role' key"):
-            agent.interact({"content": "test"})
-            
-        with pytest.raises(AssertionError, match="must contain a 'content' key"):
-            agent.interact({"role": "user"})
-
     @patch('llm_agents.agents.base.litellm')
     def test_interact_stateless(self, mock_litellm, agent, mock_tools):
         """Test stateless interaction generator."""
@@ -358,9 +364,10 @@ class TestLLMAgent:
     def test_interact_stateless_assertions(self, agent):
         """Test that interact_stateless validates setup properly."""
         messages = [{"role": "user", "content": "test"}]
+        agent.remove_session()
         
-        with pytest.raises(AssertionError, match="Make sure to call 'setup_agent'"):
-            list(agent.interact_stateless(messages, "model", "api_base", "api_key"))
+        with pytest.raises(AssertionError, match="Make sure to call 'setup_session\\(\\)' before the first interaction."):
+            list(agent.interact_stateless(messages, "ollama_chat/gpt-oss:20b", "http://localhost:11436", "api_key"))
 
     @patch('llm_agents.agents.base.datetime')
     def test_message_timestamp_addition(self, mock_datetime, agent, mock_tools):

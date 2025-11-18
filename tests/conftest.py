@@ -11,14 +11,20 @@ from pathlib import Path
 
 # Test environment setup
 @pytest.fixture(autouse=True)
-def setup_test_environment():
+def setup_test_environment(request):
     """Set up test environment variables."""
+
+    # Skip auto environment setup for tests marked with no_auto_env
+    if hasattr(request, 'node') and request.node.get_closest_marker('no_auto_env'):
+        yield {}
+        return
+
     test_env = {
-        "NEO4J_USERNAME": "test_user",
-        "NEO4J_PASSWORD": "test_password",
-        "EMBEDDING_MODEL_NAME": "test-embed-model",
+        "NEO4J_USERNAME": "neo4j",
+        "NEO4J_PASSWORD": "llm_agents",
+        "EMBEDDING_MODEL_NAME": "nomic-embed-text",
         "EMBEDDING_MODEL_API_BASE": "http://localhost:11435",
-        "AGENT_MODEL_NAME": "test-agent-model", 
+        "AGENT_MODEL_NAME": "gpt-oss:20b",
         "AGENT_MODEL_API_BASE": "http://localhost:11436",
         "OLLAMA_API_KEY": "test-api-key",
         "LLM_AGENTS_LOG_LEVEL": "DEBUG",

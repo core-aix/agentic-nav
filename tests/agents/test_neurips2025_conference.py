@@ -101,16 +101,20 @@ class TestNeurIPS2025Agent:
 
     def test_environment_variable_integration(self):
         """Test integration with environment variables."""
-        # Test that default args read from environment
+        import sys
+        import importlib
+
         with patch.dict('os.environ', {
-            'OLLAMA_LOCAL_AGENT_MODEL_NAME': 'env-model',
-            'OLLAMA_LOCAL_AGENT_MODEL_API_BASE': 'http://env-base.com',
+            'AGENT_MODEL_NAME': 'env-model',
+            'AGENT_MODEL_API_BASE': 'http://env-base.com',
             'OLLAMA_API_KEY': 'env-key'
         }):
-            # Import fresh to get updated env vars
+            # Remove from cache and reimport
+            if 'llm_agents.agents.neurips2025_conference' in sys.modules:
+                del sys.modules['llm_agents.agents.neurips2025_conference']
+
             from llm_agents.agents.neurips2025_conference import DEFAULT_NEURIPS2025_AGENT_ARGS
-            
-            args = DEFAULT_NEURIPS2025_AGENT_ARGS
-            assert args["model"] == "env-model"
-            assert args["api_base"] == "http://env-base.com"
-            assert args["api_key"] == "env-key"
+
+            assert DEFAULT_NEURIPS2025_AGENT_ARGS["model"] == "env-model"
+            assert DEFAULT_NEURIPS2025_AGENT_ARGS["api_base"] == "http://env-base.com"
+            assert DEFAULT_NEURIPS2025_AGENT_ARGS["api_key"] == "env-key"

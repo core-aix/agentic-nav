@@ -16,7 +16,10 @@ class TestNeo4jGraphWorker:
         """Mock Neo4j driver."""
         driver = Mock()
         session = Mock()
-        driver.session.return_value.__enter__.return_value = session
+        # Properly mock the context manager behavior
+        driver.session.return_value = MagicMock()
+        driver.session.return_value.__enter__ = Mock(return_value=session)
+        driver.session.return_value.__exit__ = Mock(return_value=None)
         return driver, session
 
     @pytest.fixture
@@ -45,33 +48,23 @@ class TestNeo4jGraphWorker:
                 auth=("test_user", "test_pass")
             )
 
-    @patch('llm_agents.tools.knowledge_graph.retriever.batch_embed_documents')
+    @patch.object(Neo4jGraphWorker, 'embed_user_query')
     def test_similarity_search(self, mock_embed, worker):
         """Test similarity search functionality."""
         worker_instance, mock_session = worker
         
         # Mock embedding generation
-        mock_embed.return_value = np.array([[0.1, 0.2, 0.3]])
+        mock_embed.return_value = [0.1, 0.2, 0.3]
         
-        # Mock database query results
-        mock_result = Mock()
-        mock_result.data.return_value = [
-            {
-                'id': 'paper1',
-                'name': 'Test Paper 1', 
-                'abstract': 'Test abstract 1',
-                'topic': 'ML',
-                'score': 0.95
-            },
-            {
-                'id': 'paper2',
-                'name': 'Test Paper 2',
-                'abstract': 'Test abstract 2', 
-                'topic': 'AI',
-                'score': 0.90
-            }
+        # Mock database query results - the code iterates over result directly
+        mock_records = [
+            Mock(id='paper1', name='Test Paper 1', abstract='Test abstract 1', topic='ML', score=0.95),
+            Mock(id='paper2', name='Test Paper 2', abstract='Test abstract 2', topic='AI', score=0.90)
         ]
-        mock_session.run.return_value = mock_result
+        # Configure record access as dict-like
+        for record in mock_records:
+            record.__getitem__ = lambda self, key: getattr(self, key)
+        mock_session.run.return_value = mock_records
         
         # Call similarity search
         results = worker_instance.similarity_search(
@@ -81,37 +74,35 @@ class TestNeo4jGraphWorker:
         )
         
         # Verify embedding generation was called
-        mock_embed.assert_called_once_with(
-            documents=["machine learning"],
-            model="test-embed-model",  # From test env
-            ollama_server_url="http://localhost:11435"
-        )
+        mock_embed.assert_called_once_with(text="machine learning")
         
         # Verify database query was executed
         mock_session.run.assert_called_once()
         call_args = mock_session.run.call_args
         assert "db.index.vector.queryNodes" in call_args[0][0]
         assert call_args[1]['top_k'] == 5
-        assert np.array_equal(call_args[1]['query_embedding'], [0.1, 0.2, 0.3])
+        assert call_args[1]['query_embedding'] == [0.1, 0.2, 0.3]
         
         # Verify results filtering by min_similarity
         assert len(results) == 2
         assert results[0]['id'] == 'paper1'
-        assert results[0]['score'] == 0.95
+        assert results[0]['similarity_score'] == 0.95
 
-    @patch('llm_agents.tools.knowledge_graph.retriever.batch_embed_documents')
+    @patch.object(Neo4jGraphWorker, 'embed_user_query')
     def test_similarity_search_no_min_similarity(self, mock_embed, worker):
         """Test similarity search without minimum similarity filtering."""
         worker_instance, mock_session = worker
         
-        mock_embed.return_value = np.array([[0.1, 0.2, 0.3]])
+        mock_embed.return_value = [0.1, 0.2, 0.3]
         
-        mock_result = Mock()
-        mock_result.data.return_value = [
-            {'id': 'paper1', 'name': 'Test', 'abstract': 'Test', 'topic': 'ML', 'score': 0.5},
-            {'id': 'paper2', 'name': 'Test', 'abstract': 'Test', 'topic': 'AI', 'score': 0.3}
+        mock_records = [
+            Mock(id='paper1', name='Test', abstract='Test', topic='ML', score=0.5),
+            Mock(id='paper2', name='Test', abstract='Test', topic='AI', score=0.3)
         ]
-        mock_session.run.return_value = mock_result
+        # Configure record access as dict-like
+        for record in mock_records:
+            record.__getitem__ = lambda self, key: getattr(self, key)
+        mock_session.run.return_value = mock_records
         
         results = worker_instance.similarity_search(
             user_query="test",
@@ -126,24 +117,28 @@ class TestNeo4jGraphWorker:
         """Test neighborhood search functionality."""
         worker_instance, mock_session = worker
         
-        mock_result = Mock()
-        mock_result.data.return_value = [
-            {
-                'source_paper_id': 'paper1',
-                'neighbor': {'id': 'paper2', 'name': 'Neighbor Paper'},
-                'relationship_type': 'SIMILAR_TO',
-                'relationship_properties': {'similarity': 0.85},
-                'neighbor_labels': ['Paper']
-            },
-            {
-                'source_paper_id': 'paper1', 
-                'neighbor': {'fullname': 'Author Name'},
-                'relationship_type': 'AUTHORED_BY',
-                'relationship_properties': {},
-                'neighbor_labels': ['Author']
-            }
+        mock_records = [
+            Mock(),
+            Mock()
         ]
-        mock_session.run.return_value = mock_result
+        # Configure records as dict-like objects  
+        mock_records[0].__getitem__ = lambda self, key: {
+            'source_paper_id': 'paper1',
+            'neighbor': {'id': 'paper2', 'name': 'Neighbor Paper'},
+            'relationship_type': 'SIMILAR_TO',
+            'relationship_properties': {'similarity': 0.85},
+            'neighbor_labels': ['Paper']
+        }[key]
+        
+        mock_records[1].__getitem__ = lambda self, key: {
+            'source_paper_id': 'paper1',
+            'neighbor': {'fullname': 'Author Name'},
+            'relationship_type': 'AUTHORED_BY',
+            'relationship_properties': {},
+            'neighbor_labels': ['Author']
+        }[key]
+        
+        mock_session.run.return_value = mock_records
         
         results = worker_instance.neighborhood_search(
             paper_id="paper1",
@@ -168,9 +163,7 @@ class TestNeo4jGraphWorker:
         """Test neighborhood search with relationship type filtering.""" 
         worker_instance, mock_session = worker
         
-        mock_result = Mock()
-        mock_result.data.return_value = []
-        mock_session.run.return_value = mock_result
+        mock_session.run.return_value = []
         
         worker_instance.neighborhood_search(
             paper_id="paper1",
@@ -201,15 +194,14 @@ class TestNeo4jGraphWorker:
             random_seed=42
         )
         
-        # Verify strategy function was called
+        # Verify strategy function was called (it uses driver, not session)
         mock_bfs.assert_called_once_with(
-            session=mock_session,
-            start_paper_id="start_paper", 
-            n_hops=2,
-            relationship_type="SIMILAR_TO",
-            max_results=30,
-            max_branches=3,
-            random_seed=42
+            worker_instance.driver,
+            "start_paper", 
+            2,
+            "SIMILAR_TO",
+            30,
+            3
         )
         
         assert results == mock_papers
@@ -244,19 +236,20 @@ class TestNeo4jGraphWorker:
         """Test papers by author search."""
         worker_instance, mock_session = worker
         
-        mock_result = Mock()
-        mock_result.data.return_value = [
-            {
-                'id': 'paper1',
-                'name': 'Paper by Author',
-                'abstract': 'Abstract',
-                'topic': 'ML',
-                'author_name': 'Test Author'
-            }
+        mock_records = [
+            Mock(id='paper1', name='Paper by Author', abstract='Abstract', topic='ML', author_name='Test Author')
         ]
-        mock_session.run.return_value = mock_result
+        # Configure record access as dict-like
+        mock_records[0].__getitem__ = lambda self, key: {
+            'id': 'paper1',
+            'name': 'Paper by Author',
+            'abstract': 'Abstract',
+            'topic': 'ML',
+            'author_name': 'Test Author'
+        }[key]
+        mock_session.run.return_value = mock_records
         
-        results = worker_instance.papers_by_author("Test Author")
+        results = worker_instance.search_papers_by_author("Test Author", fuzzy=False)
         
         # Verify exact match query was used
         call_args = mock_session.run.call_args
@@ -270,11 +263,9 @@ class TestNeo4jGraphWorker:
         """Test fuzzy papers by author search."""
         worker_instance, mock_session = worker
         
-        mock_result = Mock()
-        mock_result.data.return_value = []
-        mock_session.run.return_value = mock_result
+        mock_session.run.return_value = []
         
-        worker_instance.papers_by_author("Test Author", fuzzy=True)
+        worker_instance.search_papers_by_author("Test Author", fuzzy=True)
         
         # Verify fuzzy query was used
         call_args = mock_session.run.call_args
@@ -285,18 +276,19 @@ class TestNeo4jGraphWorker:
         """Test papers by topic search.""" 
         worker_instance, mock_session = worker
         
-        mock_result = Mock()
-        mock_result.data.return_value = [
-            {
-                'id': 'paper1',
-                'name': 'Topic Paper',
-                'abstract': 'Abstract',
-                'topic': 'Machine Learning'
-            }
+        mock_records = [
+            Mock(id='paper1', name='Topic Paper', abstract='Abstract', topic='Machine Learning')
         ]
-        mock_session.run.return_value = mock_result
+        # Configure record access as dict-like
+        mock_records[0].__getitem__ = lambda self, key: {
+            'id': 'paper1',
+            'name': 'Topic Paper',
+            'abstract': 'Abstract',
+            'topic': 'Machine Learning'
+        }[key]
+        mock_session.run.return_value = mock_records
         
-        results = worker_instance.papers_by_topic("Machine Learning")
+        results = worker_instance.search_papers_by_topic("Machine Learning")
         
         call_args = mock_session.run.call_args
         assert "t:Topic {name: $topic_name}" in call_args[0][0]
@@ -308,11 +300,9 @@ class TestNeo4jGraphWorker:
         """Test papers by topic including subtopics."""
         worker_instance, mock_session = worker
         
-        mock_result = Mock()
-        mock_result.data.return_value = []
-        mock_session.run.return_value = mock_result
+        mock_session.run.return_value = []
         
-        worker_instance.papers_by_topic("ML", include_subtopics=True)
+        worker_instance.search_papers_by_topic("ML", include_subtopics=True)
         
         call_args = mock_session.run.call_args
         query = call_args[0][0]
@@ -323,19 +313,20 @@ class TestNeo4jGraphWorker:
         """Test get similar papers functionality."""
         worker_instance, mock_session = worker
         
-        mock_result = Mock()
-        mock_result.data.return_value = [
-            {
-                'id': 'similar1',
-                'name': 'Similar Paper', 
-                'abstract': 'Abstract',
-                'topic': 'ML',
-                'similarity': 0.92
-            }
+        mock_records = [
+            Mock(id='similar1', name='Similar Paper', abstract='Abstract', topic='ML', similarity=0.92)
         ]
-        mock_session.run.return_value = mock_result
+        # Configure record access as dict-like
+        mock_records[0].__getitem__ = lambda self, key: {
+            'id': 'similar1',
+            'name': 'Similar Paper', 
+            'abstract': 'Abstract',
+            'topic': 'ML',
+            'similarity': 0.92
+        }[key]
+        mock_session.run.return_value = mock_records
         
-        results = worker_instance.get_similar_papers("paper1", min_similarity=0.8)
+        results = worker_instance.find_similar_papers_direct("paper1", min_similarity=0.8)
         
         call_args = mock_session.run.call_args
         assert "SIMILAR_TO" in call_args[0][0]

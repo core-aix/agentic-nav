@@ -43,7 +43,7 @@ class TestSearchSimilarPapers:
         mock_worker_class.assert_called_once_with(
             uri="bolt://localhost:7687",
             username="neo4j",
-            password=None  # From test environment
+            password="llm_agents"  # From test environment
         )
         
         # Verify search was called correctly
@@ -77,25 +77,72 @@ class TestSearchSimilarPapers:
             min_similarity=None  # default
         )
 
-    @patch.dict('os.environ', {
-        'NEO4J_URI': 'bolt://custom:7687',
-        'NEO4J_USERNAME': 'custom_user',
-        'NEO4J_PASSWORD': 'custom_pass'
-    })
-    @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
-    def test_search_uses_environment_variables(self, mock_worker_class):
+    @pytest.mark.no_auto_env
+    def test_search_uses_environment_variables(self):
         """Test that function uses environment variables for Neo4j connection."""
-        mock_worker = Mock()
-        mock_worker_class.return_value = mock_worker
-        mock_worker.similarity_search.return_value = []
+        import sys
         
-        search_similar_papers("test")
+        # Store original modules to restore later
+        original_modules = {}
+        modules_to_clear = [
+            'llm_agents.tools.knowledge_graph',
+            'llm_agents.tools.knowledge_graph.retriever'
+        ]
         
-        mock_worker_class.assert_called_once_with(
-            uri="bolt://custom:7687",
-            username="custom_user", 
-            password="custom_pass"
-        )
+        for module in modules_to_clear:
+            if module in sys.modules:
+                original_modules[module] = sys.modules[module]
+                del sys.modules[module]
+        
+        try:
+            # Set custom environment variables and apply mocks before any import
+            # The key is to patch Neo4j driver to prevent actual connection
+            with patch.dict('os.environ', {
+                'NEO4J_URI': 'bolt://custom:7687',
+                'NEO4J_USERNAME': 'custom_user', 
+                'NEO4J_PASSWORD': 'custom_pass'
+            }), \
+            patch('neo4j.GraphDatabase.driver') as mock_driver, \
+            patch('toon_format.encode') as mock_encode:
+                
+                # Setup the Neo4j driver mock
+                mock_driver_instance = Mock()
+                mock_driver.return_value = mock_driver_instance
+                mock_driver_instance.verify_connectivity.return_value = True
+                
+                # Setup session mock to support context manager protocol
+                mock_session = Mock()
+                mock_session.__enter__ = Mock(return_value=mock_session)
+                mock_session.__exit__ = Mock(return_value=False)
+                
+                # Make session.run() return an iterable result (empty list)
+                mock_result = Mock()
+                mock_result.__iter__ = Mock(return_value=iter([]))  # Empty iterator
+                mock_session.run.return_value = mock_result
+                mock_driver_instance.session.return_value = mock_session
+                
+                # Import with fresh environment variables
+                from llm_agents.tools.knowledge_graph import search_similar_papers
+                
+                # Mock the search results
+                mock_encode.return_value = "result"
+
+                # Call the function
+                result = search_similar_papers("test")
+
+                # Verify the driver was called with the correct environment variables
+                mock_driver.assert_called_once_with(
+                    "bolt://custom:7687",
+                    auth=("custom_user", "custom_pass")
+                )
+                
+                # Verify the result
+                assert result == "result"
+        
+        finally:
+            # Restore original modules to avoid interfering with other tests
+            for module, original_module in original_modules.items():
+                sys.modules[module] = original_module
 
 
 class TestFindNeighboringPapers:
@@ -130,7 +177,7 @@ class TestFindNeighboringPapers:
         mock_worker_class.assert_called_once_with(
             uri="bolt://localhost:7687",
             username="neo4j", 
-            password=None
+            password="llm_agents"
         )
         
         # Verify neighborhood search
@@ -217,7 +264,7 @@ class TestTraverseGraph:
         mock_worker_class.assert_called_once_with(
             uri="bolt://localhost:7687",
             username="neo4j",
-            password=None
+            password="llm_agents"
         )
         
         # Verify traversal call

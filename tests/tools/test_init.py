@@ -1,43 +1,82 @@
-"""
-Tests for the tools __init__.py module.
-"""
-import pytest
 from unittest.mock import patch, Mock
+import pytest
 
 from llm_agents.tools import get_all_tools
-
+from llm_agents.tools.knowledge_graph import search_similar_papers, find_neighboring_papers, traverse_graph
 
 class TestGetAllTools:
     """Test the get_all_tools function."""
 
-    @patch('llm_agents.tools.search_similar_papers')
-    @patch('llm_agents.tools.find_neighboring_papers') 
-    @patch('llm_agents.tools.traverse_graph')
-    def test_get_all_tools_returns_functions(self, mock_traverse, mock_neighbors, mock_search):
-        """Test that get_all_tools returns the imported tool functions."""
-        tools = get_all_tools()
+    @patch('llm_agents.tools.knowledge_graph.search_similar_papers')
+    @patch('llm_agents.tools.knowledge_graph.find_neighboring_papers')
+    @patch('llm_agents.tools.knowledge_graph.traverse_graph')
+    def test_get_all_tools_returns_list(self, mock_traverse, mock_neighbors, mock_search):
+        """Test that get_all_tools returns a list of all tools."""
+        # Mock the tool functions
+        mock_search_func = Mock()
+        mock_neighbors_func = Mock()
+        mock_traverse_func = Mock()
         
-        assert len(tools) == 3
-        tool_names = [tool.__name__ for tool in tools]
-        assert 'search_similar_papers' in tool_names
-        assert 'find_neighboring_papers' in tool_names
-        assert 'traverse_graph' in tool_names
+        mock_search.return_value = mock_search_func
+        mock_neighbors.return_value = mock_neighbors_func
+        mock_traverse.return_value = mock_traverse_func
 
-    @patch('llm_agents.tools.search_similar_papers')
-    def test_get_all_tools_filters_correctly(self, mock_search):
-        """Test that get_all_tools only returns callable functions."""
-        # Add some non-function attributes to the module
-        tools = get_all_tools()
-        
-        # Should only contain actual functions, not modules or classes
-        for tool in tools:
-            assert callable(tool)
-            assert not tool.__name__.startswith('_')
-            assert tool.__name__ != 'get_all_tools'
+        # Call the function
+        result = get_all_tools()
+
+        # Verify return type is list
+        assert isinstance(result, list)
+
+    @patch('llm_agents.tools.knowledge_graph.search_similar_papers')
+    @patch('llm_agents.tools.knowledge_graph.find_neighboring_papers')
+    @patch('llm_agents.tools.knowledge_graph.traverse_graph')
+    def test_get_all_tools_returns_correct_count(self, mock_traverse, mock_neighbors, mock_search):
+        """Test that get_all_tools returns the correct number of tools."""
+        # Call the function
+        result = get_all_tools()
+
+        # Verify we get exactly 3 tools
+        assert len(result) == 3
+
+    @patch('llm_agents.tools.knowledge_graph.search_similar_papers')
+    @patch('llm_agents.tools.knowledge_graph.find_neighboring_papers')
+    @patch('llm_agents.tools.knowledge_graph.traverse_graph')
+    def test_get_all_tools_contains_all_expected_tools(self, mock_traverse, mock_neighbors, mock_search):
+        """Test that get_all_tools contains all expected tool functions."""
+        # Call the function
+        result = get_all_tools()
+
+        # Verify all expected tools are in the result
+        assert search_similar_papers in result
+        assert find_neighboring_papers in result
+        assert traverse_graph in result
+
+    @patch('llm_agents.tools.knowledge_graph.search_similar_papers')
+    @patch('llm_agents.tools.knowledge_graph.find_neighboring_papers')
+    @patch('llm_agents.tools.knowledge_graph.traverse_graph')
+    def test_get_all_tools_order_matches_all_declaration(self, mock_traverse, mock_neighbors, mock_search):
+        """Test that get_all_tools returns tools in the same order as __all__."""
+        # Call the function
+        result = get_all_tools()
+
+        # Verify order matches __all__
+        assert result[0] == search_similar_papers
+        assert result[1] == find_neighboring_papers
+        assert result[2] == traverse_graph
 
     def test_get_all_tools_no_duplicates(self):
-        """Test that get_all_tools doesn't return duplicate functions."""
-        tools = get_all_tools()
-        tool_names = [tool.__name__ for tool in tools]
-        
-        assert len(tool_names) == len(set(tool_names))  # No duplicates
+        """Test that get_all_tools returns no duplicate tools."""
+        # Call the function
+        result = get_all_tools()
+
+        # Verify no duplicates
+        assert len(result) == len(set(result))
+
+    def test_get_all_tools_all_callable(self):
+        """Test that all returned tools are callable."""
+        # Call the function
+        result = get_all_tools()
+
+        # Verify all items are callable
+        for tool in result:
+            assert callable(tool)

@@ -1,5 +1,9 @@
 # LLMAgents - A collection of agents for doing scientific work
 
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+![Coverage](https://github.com/laminair/llm-agents/workflows/Tests/badge.svg)
+
+
 This repository contains code for an agent that can help you do related work for your next research project. 
 Given the sheer amount of new publications that are being published at major machine learning conferences, this agent
 can help browse papers, find similar papers, and help you write summaries to quickly get an overview of what is currently

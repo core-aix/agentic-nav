@@ -17,6 +17,8 @@ import os
 import datetime
 import logging
 import json
+
+from functools import partial
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict
 
@@ -35,25 +37,20 @@ AGENT_MODEL_API_BASE = os.environ.get("AGENT_MODEL_API_BASE", "http://localhost:
 OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY", DEFAULT_NEURIPS2025_AGENT_ARGS["api_key"])
 
 
-# Setup logging (only needs to be done once globally)
-setup_logging(
-    log_dir="logs",
-    level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "INFO")
-)
+def initialize_agent():
+    """Initialize the AGENT instance."""
+    agent = NeurIPS2025Agent(
+        model=f"ollama_chat/{AGENT_MODEL_NAME}",
+        api_base=AGENT_MODEL_API_BASE,
+        api_key=OLLAMA_API_KEY,
+        llm_args=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"],
+        global_tool_args=DEFAULT_NEURIPS2025_AGENT_ARGS["global_tool_args"],
+    )
+    agent.setup_session()
+    return agent
 
 
-AGENT = NeurIPS2025Agent(
-    model=f"ollama_chat/{AGENT_MODEL_NAME}",
-    api_base=AGENT_MODEL_API_BASE,
-    api_key=OLLAMA_API_KEY,
-    llm_args=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"],
-    global_tool_args=DEFAULT_NEURIPS2025_AGENT_ARGS["global_tool_args"],
-)
-# This is needed to configure the tools
-AGENT.setup_session()
-
-
-def initialize_agent(
+def configure_agent(
         api_base: str,
         api_key: str,
         model: str,
@@ -86,46 +83,50 @@ def initialize_agent(
 
 
 def chat_fn(
-        message: str,
-        history: List[Tuple[str, str]],
+        new_message: str,
+        history: List[Dict],
         config: Optional[Dict],
-        messages: Optional[List[Dict]]
-) -> Tuple[List[Tuple[str, str]], Optional[List[Dict]]]:
+        messages: Optional[List[Dict]],
+        agent: NeurIPS2025Agent,
+) -> Tuple[List[Dict], Optional[List[Dict]]]:
     """
     Handle chat interaction using stateless agent.
 
     Args:
-        message: User's input message
-        history: Chat history as list of (user_msg, assistant_msg) tuples
+        new_message: User's input message
+        history: Chat history as list of message dictionaries with role/content
         config: Configuration dict with model, api_base, api_key, llm_args
         messages: Current conversation messages list
+        agent: Agent instance
 
     Returns:
         Tuple of (updated_history, messages)
     """
-    if not message.strip():
+    if not new_message.strip():
         yield history, messages
         return
 
-    LOGGER.debug(f"USER PROMPT: {message}")
+    LOGGER.debug(f"USER PROMPT: {new_message}")
 
     # Safety check: ensure messages is a list
     if messages is None or not isinstance(messages, list):
         LOGGER.warning("Messages state was not properly initialized, resetting...")
-        messages = [AGENT.get_system_prompt()]
+        messages = [agent.get_system_prompt()]
 
     # Create a copy of history and messages to avoid mutation issues
     history = history.copy() if history else []
     messages = messages.copy()
 
     # Add user message to history immediately with empty assistant response
-    history.append((message, ""))
+    user_msg_dict = {"role": "user", "content": new_message}
+    assistant_msg_dict = {"role": "assistant", "content": ""}
+    history.extend([user_msg_dict, assistant_msg_dict])
 
     try:
         # Create user message with timestamp
         user_message = {
             "role": "user",
-            "content": message,
+            "content": new_message,
             "_ts": str(datetime.datetime.now(datetime.timezone.utc))
         }
 
@@ -134,7 +135,7 @@ def chat_fn(
 
         # Stream the response
         accumulated_response = ""
-        for partial_messages in AGENT.interact_stateless(
+        for partial_messages in agent.interact_stateless(
                 messages=messages,
                 model=config["model"],
                 api_base=config["api_base"],
@@ -147,8 +148,8 @@ def chat_fn(
                     accumulated_response = msg["content"]
                     break
 
-            # Update the last message in history with accumulated response
-            history[-1] = (message, accumulated_response)
+            # Update the last assistant message in history with accumulated response
+            history[-1]["content"] = accumulated_response
             yield history, partial_messages
 
         # Final update with complete messages
@@ -158,20 +159,21 @@ def chat_fn(
     except Exception as e:
         LOGGER.error(f"Agent encountered an error: {e}", exc_info=True)
         error_msg = f"❌ Error: {str(e)}"
-        history[-1] = (message, error_msg)
+        history[-1]["content"] = error_msg
         yield history, messages
 
 
 def update_system_prompt(
     new_prompt: str,
-    messages: Optional[List[Dict]]
+    messages: Optional[List[Dict]],
+    agent: NeurIPS2025Agent
 ) -> Tuple[str, Optional[List[Dict]]]:
     """Update the system prompt in the message history.
 
     Args:
         new_prompt: New system prompt
-        config: Current configuration
         messages: Current message history
+        agent: Agent instance
 
     Returns:
         Tuple of (status_message, agent_instance, config, updated_messages)
@@ -185,7 +187,7 @@ def update_system_prompt(
             messages = []
 
         # Use the static method to update system prompt
-        messages = AGENT.set_system_prompt(new_system_prompt=new_prompt, messages=messages)
+        messages = agent.set_system_prompt(new_system_prompt=new_prompt, messages=messages)
 
         LOGGER.info("System prompt updated")
         LOGGER.info(f"New system prompt: {messages[0]}")
@@ -260,18 +262,20 @@ def save_history(filename: str, messages: Optional[List[Dict]]) -> str:
 
 def clear_chat(
         config: Optional[Dict],
-        messages: Optional[List[Dict]]
+        messages: Optional[List[Dict]],
+        agent: NeurIPS2025Agent
 ) -> Tuple[str, List, Optional[List[Dict]]]:
     """Clear the chat history in the UI and reset message list.
 
     Args:
         config: Current configuration
         messages: Current message history
+        agent: Agent instance
 
     Returns:
         Tuple of (status_message, empty_history, reset_messages)
     """
-    system_prompt = AGENT.get_system_prompt()
+    system_prompt = agent.get_system_prompt()
     if isinstance(system_prompt, dict):
         reset_messages = [system_prompt]
     else:
@@ -281,12 +285,16 @@ def clear_chat(
     return "✓ Chat cleared!", [], reset_messages
 
 
-def submit_message(message, history, config, messages):
+def submit_message(message, history, config, messages, agent):
     """Wrapper to clear input and process message"""
-    yield from chat_fn(message, history, config, messages)
+    yield from chat_fn(message, history, config, messages, agent)
 
 
 def main():
+
+    # Setup the agent instance
+    agent = initialize_agent()
+
     with gr.Blocks(
         title="SciAgent For NeurIPS 2025",
         theme=gr.themes.Default(
@@ -301,7 +309,7 @@ def main():
 
         # Session state for agent instance, config, and messages
         config_state = gr.State(value=DEFAULT_NEURIPS2025_AGENT_ARGS)
-        messages_state = gr.State(value=[AGENT.get_system_prompt()])
+        messages_state = gr.State(value=[agent.get_system_prompt()])
 
         with gr.Row():
             with gr.Column(scale=1):
@@ -364,7 +372,7 @@ def main():
                 with gr.Accordion("System Prompt", open=False):
                     system_prompt_input = gr.Textbox(
                         label="System Prompt",
-                        value=AGENT.get_system_prompt()["content"] if type(AGENT.get_system_prompt()) is dict else None,
+                        value=agent.get_system_prompt()["content"] if type(agent.get_system_prompt()) is dict else None,
                         placeholder="Enter custom system prompt here...",
                         lines=12
                     )
@@ -391,7 +399,7 @@ def main():
                 chatbot = gr.Chatbot(
                     label="Conversation Trail",
                     height=500,
-                    type="tuples",
+                    type="messages",
                     show_copy_button=True,
                 )
 
@@ -428,7 +436,7 @@ def main():
 
         # Event handlers
         init_btn.click(
-            fn=initialize_agent,
+            fn=configure_agent,
             inputs=[
                 api_base_input,
                 api_key_input,
@@ -444,7 +452,7 @@ def main():
 
         # Chat submission
         submit_btn.click(
-            fn=submit_message,
+            fn=lambda msg_input, chatbot, config_state, messages_state: (yield from submit_message(msg_input, chatbot, config_state, messages_state, agent)),
             inputs=[msg_input, chatbot, config_state, messages_state],
             outputs=[chatbot, messages_state]
         ).then(
@@ -454,7 +462,7 @@ def main():
         )
 
         msg_input.submit(
-            fn=submit_message,
+            fn=lambda msg_input, chatbot, config_state, messages_state: (yield from submit_message(msg_input, chatbot, config_state, messages_state, agent)),
             inputs=[msg_input, chatbot, config_state, messages_state],
             outputs=[chatbot, messages_state]
         ).then(
@@ -465,11 +473,8 @@ def main():
 
         # System prompt update
         update_system_btn.click(
-            fn=update_system_prompt,
-            inputs=[
-                system_prompt_input,
-                messages_state
-            ],
+            fn=lambda system_prompt_input, messages_state: update_system_prompt(system_prompt_input, messages_state, agent),
+            inputs=[system_prompt_input, messages_state],
             outputs=[system_status, messages_state]
         )
 
@@ -489,7 +494,7 @@ def main():
 
         # Clear chat
         clear_btn.click(
-            fn=clear_chat,
+            fn=lambda config_state, messages_state: clear_chat(config_state, messages_state, agent),
             inputs=[config_state, messages_state],
             outputs=[save_status, chatbot, messages_state]
         )
@@ -504,4 +509,10 @@ def main():
 
 
 if __name__ == "__main__":
+    # Setup logging (only needs to be done once globally)
+    setup_logging(
+        log_dir="logs",
+        level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "INFO")
+    )
+
     main()
