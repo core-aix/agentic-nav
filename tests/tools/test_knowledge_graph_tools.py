@@ -39,11 +39,15 @@ class TestSearchSimilarPapers:
             min_similarity=0.8
         )
         
-        # Verify worker was created with correct params
+        # Verify worker was created with correct params (use environment variables from conftest.py)
+        import os
+        expected_uri = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+        expected_username = os.getenv('NEO4J_USERNAME', 'neo4j')
+        expected_password = os.getenv('NEO4J_PASSWORD')
         mock_worker_class.assert_called_once_with(
-            uri="bolt://localhost:7687",
-            username="neo4j",
-            password="llm_agents"  # From test environment
+            uri=expected_uri,
+            username=expected_username,
+            password=expected_password
         )
         
         # Verify search was called correctly
@@ -103,7 +107,8 @@ class TestSearchSimilarPapers:
                 'NEO4J_PASSWORD': 'custom_pass'
             }), \
             patch('neo4j.GraphDatabase.driver') as mock_driver, \
-            patch('toon_format.encode') as mock_encode:
+            patch('toon_format.encode') as mock_encode, \
+            patch('llm_agents.utils.embedding_generator.embedding') as mock_embedding:
                 
                 # Setup the Neo4j driver mock
                 mock_driver_instance = Mock()
@@ -120,6 +125,12 @@ class TestSearchSimilarPapers:
                 mock_result.__iter__ = Mock(return_value=iter([]))  # Empty iterator
                 mock_session.run.return_value = mock_result
                 mock_driver_instance.session.return_value = mock_session
+                
+                # Mock embedding responses
+                mock_response = Mock()
+                mock_response.data = [{"embedding": [0.1, 0.2, 0.3]}]
+                mock_response.__getitem__ = lambda self, key: mock_response.data if key == "data" else None
+                mock_embedding.return_value = mock_response
                 
                 # Import with fresh environment variables
                 from llm_agents.tools.knowledge_graph import search_similar_papers
@@ -174,10 +185,14 @@ class TestFindNeighboringPapers:
         )
         
         # Verify worker creation
+        import os
+        expected_uri = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+        expected_username = os.getenv('NEO4J_USERNAME', 'neo4j')
+        expected_password = os.getenv('NEO4J_PASSWORD')
         mock_worker_class.assert_called_once_with(
-            uri="bolt://localhost:7687",
-            username="neo4j", 
-            password="llm_agents"
+            uri=expected_uri,
+            username=expected_username, 
+            password=expected_password
         )
         
         # Verify neighborhood search
@@ -261,10 +276,14 @@ class TestTraverseGraph:
         )
         
         # Verify worker creation
+        import os
+        expected_uri = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+        expected_username = os.getenv('NEO4J_USERNAME', 'neo4j')
+        expected_password = os.getenv('NEO4J_PASSWORD')
         mock_worker_class.assert_called_once_with(
-            uri="bolt://localhost:7687",
-            username="neo4j",
-            password="llm_agents"
+            uri=expected_uri,
+            username=expected_username,
+            password=expected_password
         )
         
         # Verify traversal call

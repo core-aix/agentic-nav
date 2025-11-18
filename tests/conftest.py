@@ -20,6 +20,7 @@ def setup_test_environment(request):
         return
 
     test_env = {
+        "NEO4J_URI": "bolt://localhost:7687",
         "NEO4J_USERNAME": "neo4j",
         "NEO4J_PASSWORD": "llm_agents",
         "EMBEDDING_MODEL_NAME": "nomic-embed-text",
