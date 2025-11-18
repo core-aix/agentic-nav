@@ -16,6 +16,9 @@ class TestSearchSimilarPapers:
 
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
     def test_search_similar_papers_basic(self, mock_encode, mock_worker_class):
         """Test basic similarity search functionality."""
         # Mock the worker instance
@@ -39,15 +42,11 @@ class TestSearchSimilarPapers:
             min_similarity=0.8
         )
         
-        # Verify worker was created with correct params (use environment variables from conftest.py)
-        import os
-        expected_uri = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
-        expected_username = os.getenv('NEO4J_USERNAME', 'neo4j')
-        expected_password = os.getenv('NEO4J_PASSWORD')
+        # Verify worker was created with correct params (patched values)
         mock_worker_class.assert_called_once_with(
-            uri=expected_uri,
-            username=expected_username,
-            password=expected_password
+            uri='bolt://localhost:7687',
+            username='neo4j',
+            password='llm_agents'
         )
         
         # Verify search was called correctly
@@ -65,6 +64,9 @@ class TestSearchSimilarPapers:
 
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
     def test_search_similar_papers_default_params(self, mock_encode, mock_worker_class):
         """Test search with default parameters."""
         mock_worker = Mock()
@@ -162,6 +164,9 @@ class TestFindNeighboringPapers:
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
     @patch('llm_agents.tools.knowledge_graph.random.shuffle')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
     def test_find_neighboring_papers_basic(self, mock_shuffle, mock_encode, mock_worker_class):
         """Test basic neighborhood search functionality."""
         mock_worker = Mock()
@@ -185,14 +190,10 @@ class TestFindNeighboringPapers:
         )
         
         # Verify worker creation
-        import os
-        expected_uri = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
-        expected_username = os.getenv('NEO4J_USERNAME', 'neo4j')
-        expected_password = os.getenv('NEO4J_PASSWORD')
         mock_worker_class.assert_called_once_with(
-            uri=expected_uri,
-            username=expected_username, 
-            password=expected_password
+            uri='bolt://localhost:7687',
+            username='neo4j', 
+            password='llm_agents'
         )
         
         # Verify neighborhood search
@@ -211,6 +212,9 @@ class TestFindNeighboringPapers:
 
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
     def test_find_neighboring_papers_string_relationship_type(self, mock_encode, mock_worker_class):
         """Test that string relationship_type is converted to list."""
         mock_worker = Mock()
@@ -232,6 +236,9 @@ class TestFindNeighboringPapers:
 
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
     def test_find_neighboring_papers_defaults(self, mock_encode, mock_worker_class):
         """Test function with default parameters."""
         mock_worker = Mock()
@@ -253,6 +260,9 @@ class TestTraverseGraph:
 
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
     def test_traverse_graph_basic(self, mock_encode, mock_worker_class):
         """Test basic graph traversal functionality."""
         mock_worker = Mock()
@@ -276,14 +286,10 @@ class TestTraverseGraph:
         )
         
         # Verify worker creation
-        import os
-        expected_uri = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
-        expected_username = os.getenv('NEO4J_USERNAME', 'neo4j')
-        expected_password = os.getenv('NEO4J_PASSWORD')
         mock_worker_class.assert_called_once_with(
-            uri=expected_uri,
-            username=expected_username,
-            password=expected_password
+            uri='bolt://localhost:7687',
+            username='neo4j',
+            password='llm_agents'
         )
         
         # Verify traversal call
@@ -304,6 +310,9 @@ class TestTraverseGraph:
 
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
     def test_traverse_graph_defaults(self, mock_encode, mock_worker_class):
         """Test graph traversal with default parameters."""
         mock_worker = Mock()
@@ -326,6 +335,9 @@ class TestTraverseGraph:
 
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
+    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
     def test_traverse_graph_optional_none_values(self, mock_encode, mock_worker_class):
         """Test graph traversal with None values for optional parameters."""
         mock_worker = Mock()
