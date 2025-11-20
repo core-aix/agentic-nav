@@ -2,119 +2,124 @@
 Tests for knowledge graph tool functions.
 """
 import pytest
+import sys
+import importlib
 from unittest.mock import patch, Mock, MagicMock
 
-from llm_agents.tools.knowledge_graph import (
-    search_similar_papers,
-    find_neighboring_papers, 
-    traverse_graph
-)
+
+def reload_knowledge_graph_module():
+    """Reload the knowledge graph module to pick up environment changes."""
+    if 'llm_agents.tools.knowledge_graph' in sys.modules:
+        importlib.reload(sys.modules['llm_agents.tools.knowledge_graph'])
+    else:
+        import llm_agents.tools.knowledge_graph
+
+    from llm_agents.tools.knowledge_graph import (
+        search_similar_papers,
+        find_neighboring_papers,
+        traverse_graph
+    )
+    return search_similar_papers, find_neighboring_papers, traverse_graph
 
 
 class TestSearchSimilarPapers:
     """Test the search_similar_papers function."""
 
-    @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
-    @patch('llm_agents.tools.knowledge_graph.toon_encode')
-    @patch.dict('os.environ', {
-        'NEO4J_URI': 'bolt://localhost:7687',
-        'NEO4J_USERNAME': 'neo4j',
-        'NEO4J_PASSWORD': 'llm_agents'
-    })
-    def test_search_similar_papers_basic(self, mock_encode, mock_worker_class):
+    def test_search_similar_papers_basic(self):
         """Test basic similarity search functionality."""
-        # Mock the worker instance
-        mock_worker = Mock()
-        mock_worker_class.return_value = mock_worker
-        
-        # Mock search results
-        mock_papers = [
-            {"id": "paper1", "title": "Test Paper 1", "score": 0.95},
-            {"id": "paper2", "title": "Test Paper 2", "score": 0.90}
-        ]
-        mock_worker.similarity_search.return_value = mock_papers
-        
-        # Mock encoding
-        mock_encode.return_value = "encoded_papers"
-        
-        # Call the function
-        result = search_similar_papers(
-            user_query="machine learning",
-            num_papers_to_return=5,
-            min_similarity=0.8
-        )
-        
-        # Verify worker was created with correct params (patched values)
-        mock_worker_class.assert_called_once_with(
-            uri='bolt://localhost:7687',
-            username='neo4j',
-            password='llm_agents'
-        )
-        
-        # Verify search was called correctly
-        mock_worker.similarity_search.assert_called_once_with(
-            user_query="machine learning",
-            top_k=5,
-            min_similarity=0.8
-        )
-        
-        # Verify encoding was applied
-        mock_encode.assert_called_once_with(mock_papers)
-        
-        # Verify return value
-        assert result == "encoded_papers"
+        with patch.dict('os.environ', {
+            'NEO4J_URI': 'bolt://localhost:7687',
+            'NEO4J_USERNAME': 'neo4j',
+            'NEO4J_PASSWORD': 'llm_agents'
+        }):
+            # Reload module to pick up patched environment variables
+            search_similar_papers, _, _ = reload_knowledge_graph_module()
 
-    @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
-    @patch('llm_agents.tools.knowledge_graph.toon_encode')
-    @patch.dict('os.environ', {
-        'NEO4J_URI': 'bolt://localhost:7687',
-        'NEO4J_USERNAME': 'neo4j',
-        'NEO4J_PASSWORD': 'llm_agents'
-    })
-    def test_search_similar_papers_default_params(self, mock_encode, mock_worker_class):
+            with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+                 patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode:
+
+                # Mock the worker instance
+                mock_worker = Mock()
+                mock_worker_class.return_value = mock_worker
+
+                # Mock search results
+                mock_papers = [
+                    {"id": "paper1", "title": "Test Paper 1", "score": 0.95},
+                    {"id": "paper2", "title": "Test Paper 2", "score": 0.90}
+                ]
+                mock_worker.similarity_search.return_value = mock_papers
+
+                # Mock encoding
+                mock_encode.return_value = "encoded_papers"
+
+                # Call the function
+                result = search_similar_papers(
+                    user_query="machine learning",
+                    num_papers_to_return=5,
+                    min_similarity=0.8
+                )
+
+                # Verify worker was created with correct params (patched values)
+                mock_worker_class.assert_called_once_with(
+                    uri='bolt://localhost:7687',
+                    username='neo4j',
+                    password='llm_agents'
+                )
+
+                # Verify search was called correctly
+                mock_worker.similarity_search.assert_called_once_with(
+                    user_query="machine learning",
+                    top_k=5,
+                    min_similarity=0.8
+                )
+
+                # Verify encoding was applied
+                mock_encode.assert_called_once_with(mock_papers)
+
+                # Verify return value
+                assert result == "encoded_papers"
+
+    def test_search_similar_papers_default_params(self):
         """Test search with default parameters."""
-        mock_worker = Mock()
-        mock_worker_class.return_value = mock_worker
-        mock_worker.similarity_search.return_value = []
-        mock_encode.return_value = "empty_results"
-        
-        result = search_similar_papers("test query")
-        
-        # Verify default parameters were used
-        mock_worker.similarity_search.assert_called_once_with(
-            user_query="test query",
-            top_k=10,  # default
-            min_similarity=None  # default
-        )
+        with patch.dict('os.environ', {
+            'NEO4J_URI': 'bolt://localhost:7687',
+            'NEO4J_USERNAME': 'neo4j',
+            'NEO4J_PASSWORD': 'llm_agents'
+        }):
+            # Reload module to pick up patched environment variables
+            search_similar_papers, _, _ = reload_knowledge_graph_module()
+
+            with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+                 patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode:
+
+                mock_worker = Mock()
+                mock_worker_class.return_value = mock_worker
+                mock_worker.similarity_search.return_value = []
+                mock_encode.return_value = "empty_results"
+
+                result = search_similar_papers("test query")
+
+                # Verify default parameters were used
+                mock_worker.similarity_search.assert_called_once_with(
+                    user_query="test query",
+                    top_k=10,  # default
+                    min_similarity=None  # default
+                )
 
     @pytest.mark.no_auto_env
     def test_search_uses_environment_variables(self):
         """Test that function uses environment variables for Neo4j connection."""
-        import sys
-        import importlib
+        with patch.dict('os.environ', {
+            'NEO4J_URI': 'bolt://custom:7687',
+            'NEO4J_USERNAME': 'custom_user',
+            'NEO4J_PASSWORD': 'custom_pass'
+        }):
+            # Reload module to pick up patched environment variables
+            search_similar_papers, _, _ = reload_knowledge_graph_module()
 
-        # Store original modules to restore later
-        original_modules = {}
-        modules_to_clear = [
-            'llm_agents.tools.knowledge_graph',
-            'llm_agents.tools.knowledge_graph.retriever'
-        ]
-
-        for module in modules_to_clear:
-            if module in sys.modules:
-                original_modules[module] = sys.modules[module]
-                del sys.modules[module]
-
-        try:
-            # Set custom environment variables FIRST, before any imports
-            with patch.dict('os.environ', {
-                'NEO4J_URI': 'bolt://custom:7687',
-                'NEO4J_USERNAME': 'custom_user',
-                'NEO4J_PASSWORD': 'custom_pass'
-            }, clear=False), \
-            patch('neo4j.GraphDatabase.driver') as mock_driver, \
-            patch('toon_format.encode') as mock_encode, \
-            patch('llm_agents.utils.embedding_generator.embedding') as mock_embedding:
+            with patch('neo4j.GraphDatabase.driver') as mock_driver, \
+                 patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode, \
+                 patch('llm_agents.utils.embedding_generator.embedding') as mock_embedding:
 
                 # Setup the Neo4j driver mock
                 mock_driver_instance = Mock()
@@ -138,11 +143,6 @@ class TestSearchSimilarPapers:
                 mock_response.__getitem__ = lambda self, key: mock_response.data if key == "data" else None
                 mock_embedding.return_value = mock_response
 
-                # Now import the module - it will read from patched environment
-                import llm_agents.tools.knowledge_graph
-                importlib.reload(llm_agents.tools.knowledge_graph)
-                from llm_agents.tools.knowledge_graph import search_similar_papers
-
                 # Mock the search results
                 mock_encode.return_value = "result"
 
@@ -158,226 +158,245 @@ class TestSearchSimilarPapers:
                 # Verify the result
                 assert result == "result"
 
-        finally:
-            # Restore original modules to avoid interfering with other tests
-            for module, original_module in original_modules.items():
-                sys.modules[module] = original_module
-
 
 class TestFindNeighboringPapers:
     """Test the find_neighboring_papers function."""
 
-    @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
-    @patch('llm_agents.tools.knowledge_graph.toon_encode')
-    @patch('llm_agents.tools.knowledge_graph.random.shuffle')
-    @patch.dict('os.environ', {
-        'NEO4J_URI': 'bolt://localhost:7687',
-        'NEO4J_USERNAME': 'neo4j',
-        'NEO4J_PASSWORD': 'llm_agents'
-    })
-    def test_find_neighboring_papers_basic(self, mock_shuffle, mock_encode, mock_worker_class):
+    def test_find_neighboring_papers_basic(self):
         """Test basic neighborhood search functionality."""
-        mock_worker = Mock()
-        mock_worker_class.return_value = mock_worker
-        
-        # Mock neighborhood search results
-        mock_neighbors = {
-            "similar_papers": [
-                {"neighbor": {"id": "paper1", "title": "Similar Paper 1"}},
-                {"neighbor": {"id": "paper2", "title": "Similar Paper 2"}}
-            ]
-        }
-        mock_worker.neighborhood_search.return_value = mock_neighbors
-        mock_encode.return_value = "encoded_neighbors"
-        
-        result = find_neighboring_papers(
-            paper_id="test_paper_id",
-            relationship_types=["SIMILAR_TO"],
-            neighbor_entity="similar_papers",
-            num_neighbors_to_return=5
-        )
-        
-        # Verify worker creation
-        mock_worker_class.assert_called_once_with(
-            uri='bolt://localhost:7687',
-            username='neo4j', 
-            password='llm_agents'
-        )
-        
-        # Verify neighborhood search
-        mock_worker.neighborhood_search.assert_called_once_with(
-            paper_id="test_paper_id",
-            relationship_types=["SIMILAR_TO"]
-        )
-        
-        # Verify shuffle was called
-        mock_shuffle.assert_called_once()
-        
-        # Verify encoding
-        mock_encode.assert_called_once()
-        
-        assert result == "encoded_neighbors"
+        with patch.dict('os.environ', {
+            'NEO4J_URI': 'bolt://localhost:7687',
+            'NEO4J_USERNAME': 'neo4j',
+            'NEO4J_PASSWORD': 'llm_agents'
+        }):
+            # Reload module to pick up patched environment variables
+            _, find_neighboring_papers, _ = reload_knowledge_graph_module()
 
-    @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
-    @patch('llm_agents.tools.knowledge_graph.toon_encode')
-    @patch.dict('os.environ', {
-        'NEO4J_URI': 'bolt://localhost:7687',
-        'NEO4J_USERNAME': 'neo4j',
-        'NEO4J_PASSWORD': 'llm_agents'
-    })
-    def test_find_neighboring_papers_string_relationship_type(self, mock_encode, mock_worker_class):
+            with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+                 patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode, \
+                 patch('llm_agents.tools.knowledge_graph.random.shuffle') as mock_shuffle:
+
+                mock_worker = Mock()
+                mock_worker_class.return_value = mock_worker
+
+                # Mock neighborhood search results
+                mock_neighbors = {
+                    "similar_papers": [
+                        {"neighbor": {"id": "paper1", "title": "Similar Paper 1"}},
+                        {"neighbor": {"id": "paper2", "title": "Similar Paper 2"}}
+                    ]
+                }
+                mock_worker.neighborhood_search.return_value = mock_neighbors
+                mock_encode.return_value = "encoded_neighbors"
+
+                result = find_neighboring_papers(
+                    paper_id="test_paper_id",
+                    relationship_types=["SIMILAR_TO"],
+                    neighbor_entity="similar_papers",
+                    num_neighbors_to_return=5
+                )
+
+                # Verify worker creation
+                mock_worker_class.assert_called_once_with(
+                    uri='bolt://localhost:7687',
+                    username='neo4j',
+                    password='llm_agents'
+                )
+
+                # Verify neighborhood search
+                mock_worker.neighborhood_search.assert_called_once_with(
+                    paper_id="test_paper_id",
+                    relationship_types=["SIMILAR_TO"]
+                )
+
+                # Verify shuffle was called
+                mock_shuffle.assert_called_once()
+
+                # Verify encoding
+                mock_encode.assert_called_once()
+
+                assert result == "encoded_neighbors"
+
+    def test_find_neighboring_papers_string_relationship_type(self):
         """Test that string relationship_type is converted to list."""
-        mock_worker = Mock()
-        mock_worker_class.return_value = mock_worker
-        mock_worker.neighborhood_search.return_value = {"similar_papers": []}
-        mock_encode.return_value = "result"
-        
-        find_neighboring_papers(
-            paper_id="test_id",
-            relationship_types="SIMILAR_TO",  # String instead of list
-            neighbor_entity="similar_papers"
-        )
-        
-        # Should convert string to list
-        mock_worker.neighborhood_search.assert_called_once_with(
-            paper_id="test_id",
-            relationship_types=["SIMILAR_TO"]
-        )
+        with patch.dict('os.environ', {
+            'NEO4J_URI': 'bolt://localhost:7687',
+            'NEO4J_USERNAME': 'neo4j',
+            'NEO4J_PASSWORD': 'llm_agents'
+        }):
+            # Reload module to pick up patched environment variables
+            _, find_neighboring_papers, _ = reload_knowledge_graph_module()
 
-    @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
-    @patch('llm_agents.tools.knowledge_graph.toon_encode')
-    @patch.dict('os.environ', {
-        'NEO4J_URI': 'bolt://localhost:7687',
-        'NEO4J_USERNAME': 'neo4j',
-        'NEO4J_PASSWORD': 'llm_agents'
-    })
-    def test_find_neighboring_papers_defaults(self, mock_encode, mock_worker_class):
+            with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+                 patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode:
+
+                mock_worker = Mock()
+                mock_worker_class.return_value = mock_worker
+                mock_worker.neighborhood_search.return_value = {"similar_papers": []}
+                mock_encode.return_value = "result"
+
+                find_neighboring_papers(
+                    paper_id="test_id",
+                    relationship_types="SIMILAR_TO",  # String instead of list
+                    neighbor_entity="similar_papers"
+                )
+
+                # Should convert string to list
+                mock_worker.neighborhood_search.assert_called_once_with(
+                    paper_id="test_id",
+                    relationship_types=["SIMILAR_TO"]
+                )
+
+    def test_find_neighboring_papers_defaults(self):
         """Test function with default parameters."""
-        mock_worker = Mock()
-        mock_worker_class.return_value = mock_worker
-        mock_worker.neighborhood_search.return_value = {"similar_papers": []}
-        mock_encode.return_value = "result"
-        
-        find_neighboring_papers("test_id")
-        
-        # Verify defaults are used
-        mock_worker.neighborhood_search.assert_called_once_with(
-            paper_id="test_id",
-            relationship_types=["SIMILAR_TO"]  # default
-        )
+        with patch.dict('os.environ', {
+            'NEO4J_URI': 'bolt://localhost:7687',
+            'NEO4J_USERNAME': 'neo4j',
+            'NEO4J_PASSWORD': 'llm_agents'
+        }):
+            # Reload module to pick up patched environment variables
+            _, find_neighboring_papers, _ = reload_knowledge_graph_module()
+
+            with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+                 patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode:
+
+                mock_worker = Mock()
+                mock_worker_class.return_value = mock_worker
+                mock_worker.neighborhood_search.return_value = {"similar_papers": []}
+                mock_encode.return_value = "result"
+
+                find_neighboring_papers("test_id")
+
+                # Verify defaults are used
+                mock_worker.neighborhood_search.assert_called_once_with(
+                    paper_id="test_id",
+                    relationship_types=["SIMILAR_TO"]  # default
+                )
 
 
 class TestTraverseGraph:
     """Test the traverse_graph function."""
 
-    @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
-    @patch('llm_agents.tools.knowledge_graph.toon_encode')
-    @patch.dict('os.environ', {
-        'NEO4J_URI': 'bolt://localhost:7687',
-        'NEO4J_USERNAME': 'neo4j',
-        'NEO4J_PASSWORD': 'llm_agents'
-    })
-    def test_traverse_graph_basic(self, mock_encode, mock_worker_class):
+    def test_traverse_graph_basic(self):
         """Test basic graph traversal functionality."""
-        mock_worker = Mock()
-        mock_worker_class.return_value = mock_worker
-        
-        mock_papers = [
-            {"id": "paper1", "title": "Traversed Paper 1"},
-            {"id": "paper2", "title": "Traversed Paper 2"}
-        ]
-        mock_worker.graph_traversal.return_value = mock_papers
-        mock_encode.return_value = "encoded_traversal"
-        
-        result = traverse_graph(
-            start_paper_id="start_id",
-            n_hops=3,
-            relationship_type="SIMILAR_TO",
-            max_results=50,
-            strategy="depth_first",
-            max_branches=3,
-            random_seed=123
-        )
-        
-        # Verify worker creation
-        mock_worker_class.assert_called_once_with(
-            uri='bolt://localhost:7687',
-            username='neo4j',
-            password='llm_agents'
-        )
-        
-        # Verify traversal call
-        mock_worker.graph_traversal.assert_called_once_with(
-            start_paper_id="start_id",
-            n_hops=3,
-            relationship_type="SIMILAR_TO",
-            max_results=50,
-            strategy="depth_first",
-            max_branches=3,
-            random_seed=123
-        )
-        
-        # Verify encoding
-        mock_encode.assert_called_once_with(mock_papers)
-        
-        assert result == "encoded_traversal"
+        with patch.dict('os.environ', {
+            'NEO4J_URI': 'bolt://localhost:7687',
+            'NEO4J_USERNAME': 'neo4j',
+            'NEO4J_PASSWORD': 'llm_agents'
+        }):
+            # Reload module to pick up patched environment variables
+            _, _, traverse_graph = reload_knowledge_graph_module()
 
-    @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
-    @patch('llm_agents.tools.knowledge_graph.toon_encode')
-    @patch.dict('os.environ', {
-        'NEO4J_URI': 'bolt://localhost:7687',
-        'NEO4J_USERNAME': 'neo4j',
-        'NEO4J_PASSWORD': 'llm_agents'
-    })
-    def test_traverse_graph_defaults(self, mock_encode, mock_worker_class):
+            with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+                 patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode:
+
+                mock_worker = Mock()
+                mock_worker_class.return_value = mock_worker
+
+                mock_papers = [
+                    {"id": "paper1", "title": "Traversed Paper 1"},
+                    {"id": "paper2", "title": "Traversed Paper 2"}
+                ]
+                mock_worker.graph_traversal.return_value = mock_papers
+                mock_encode.return_value = "encoded_traversal"
+
+                result = traverse_graph(
+                    start_paper_id="start_id",
+                    n_hops=3,
+                    relationship_type="SIMILAR_TO",
+                    max_results=50,
+                    strategy="depth_first",
+                    max_branches=3,
+                    random_seed=123
+                )
+
+                # Verify worker creation
+                mock_worker_class.assert_called_once_with(
+                    uri='bolt://localhost:7687',
+                    username='neo4j',
+                    password='llm_agents'
+                )
+
+                # Verify traversal call
+                mock_worker.graph_traversal.assert_called_once_with(
+                    start_paper_id="start_id",
+                    n_hops=3,
+                    relationship_type="SIMILAR_TO",
+                    max_results=50,
+                    strategy="depth_first",
+                    max_branches=3,
+                    random_seed=123
+                )
+
+                # Verify encoding
+                mock_encode.assert_called_once_with(mock_papers)
+
+                assert result == "encoded_traversal"
+
+    def test_traverse_graph_defaults(self):
         """Test graph traversal with default parameters."""
-        mock_worker = Mock()
-        mock_worker_class.return_value = mock_worker
-        mock_worker.graph_traversal.return_value = []
-        mock_encode.return_value = "result"
-        
-        traverse_graph("start_id")
-        
-        # Verify default parameters
-        mock_worker.graph_traversal.assert_called_once_with(
-            start_paper_id="start_id",
-            n_hops=2,  # default
-            relationship_type="BELONGS_TO_TOPIC",  # default
-            max_results=30,  # default
-            strategy="breadth_first_random",  # default
-            max_branches=2,  # default
-            random_seed=42  # default
-        )
+        with patch.dict('os.environ', {
+            'NEO4J_URI': 'bolt://localhost:7687',
+            'NEO4J_USERNAME': 'neo4j',
+            'NEO4J_PASSWORD': 'llm_agents'
+        }):
+            # Reload module to pick up patched environment variables
+            _, _, traverse_graph = reload_knowledge_graph_module()
 
-    @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
-    @patch('llm_agents.tools.knowledge_graph.toon_encode')
-    @patch.dict('os.environ', {
-        'NEO4J_URI': 'bolt://localhost:7687',
-        'NEO4J_USERNAME': 'neo4j',
-        'NEO4J_PASSWORD': 'llm_agents'
-    })
-    def test_traverse_graph_optional_none_values(self, mock_encode, mock_worker_class):
+            with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+                 patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode:
+
+                mock_worker = Mock()
+                mock_worker_class.return_value = mock_worker
+                mock_worker.graph_traversal.return_value = []
+                mock_encode.return_value = "result"
+
+                traverse_graph("start_id")
+
+                # Verify default parameters
+                mock_worker.graph_traversal.assert_called_once_with(
+                    start_paper_id="start_id",
+                    n_hops=2,  # default
+                    relationship_type="BELONGS_TO_TOPIC",  # default
+                    max_results=30,  # default
+                    strategy="breadth_first_random",  # default
+                    max_branches=2,  # default
+                    random_seed=42  # default
+                )
+
+    def test_traverse_graph_optional_none_values(self):
         """Test graph traversal with None values for optional parameters."""
-        mock_worker = Mock()
-        mock_worker_class.return_value = mock_worker
-        mock_worker.graph_traversal.return_value = []
-        mock_encode.return_value = "result"
-        
-        traverse_graph(
-            start_paper_id="start_id",
-            relationship_type=None,
-            max_results=None,
-            max_branches=None,
-            random_seed=None
-        )
-        
-        # Verify None values are passed through
-        mock_worker.graph_traversal.assert_called_once_with(
-            start_paper_id="start_id",
-            n_hops=2,  # default
-            relationship_type=None,
-            max_results=None,
-            strategy="breadth_first_random",  # default
-            max_branches=None,
-            random_seed=None
-        )
+        with patch.dict('os.environ', {
+            'NEO4J_URI': 'bolt://localhost:7687',
+            'NEO4J_USERNAME': 'neo4j',
+            'NEO4J_PASSWORD': 'llm_agents'
+        }):
+            # Reload module to pick up patched environment variables
+            _, _, traverse_graph = reload_knowledge_graph_module()
+
+            with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+                 patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode:
+
+                mock_worker = Mock()
+                mock_worker_class.return_value = mock_worker
+                mock_worker.graph_traversal.return_value = []
+                mock_encode.return_value = "result"
+
+                traverse_graph(
+                    start_paper_id="start_id",
+                    relationship_type=None,
+                    max_results=None,
+                    max_branches=None,
+                    random_seed=None
+                )
+
+                # Verify None values are passed through
+                mock_worker.graph_traversal.assert_called_once_with(
+                    start_paper_id="start_id",
+                    n_hops=2,  # default
+                    relationship_type=None,
+                    max_results=None,
+                    strategy="breadth_first_random",  # default
+                    max_branches=None,
+                    random_seed=None
+                )
