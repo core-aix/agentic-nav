@@ -22,6 +22,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 LOGGER = logging.getLogger(__name__)
 EMBEDDING_MODEL_NAME = os.environ.get("EMBEDDING_MODEL_NAME", "nomic-embed-text")
 EMBEDDING_MODEL_API_BASE = os.environ.get("EMBEDDING_MODEL_API_BASE", "http://localhost:11435")
+NEO4J_DB_URI = os.environ.get("NEO4J_DB_URI", "bolt://neo4j_db:7687")
 
 
 class Neo4jGraphWorker:
@@ -50,7 +51,6 @@ class Neo4jGraphWorker:
         """)
 
     # Find the DB query for graph traversal in the graph_traversal sub-folder.
-
     _DB_PAPERS_BY_AUTHOR = """
         MATCH (p:Paper)-[:AUTHORED_BY]->(a:Author)
         WHERE a.fullname = $author_name
@@ -109,7 +109,7 @@ class Neo4jGraphWorker:
 
     def __init__(
             self,
-            uri: str = "bolt://localhost:7687",
+            uri: str = NEO4J_DB_URI,
             username: str = "neo4j",
             password: str = "password"
     ):
