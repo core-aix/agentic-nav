@@ -477,8 +477,8 @@ class Neo4jImporter:
 @click.command()
 @click.option("-g", "--graph-path", help="Path to the knowledge graph file (pickle).", default=f"{PROJECT_ROOT}/graphs/knowledge_graph.pkl")
 @click.option("-l", "--neo4j-uri", help="Database URI", default="bolt://localhost:7687")
-@click.option("-u", "--neo4j-username", help="Database user", default="neo4j")
-@click.option("-p", "--neo4j-password", help="Database password")
+@click.option("-u", "--neo4j-username", help="Database user", default=NEO4J_USERNAME)
+@click.option("-p", "--neo4j-password", help="Database password", default=NEO4J_PASSWORD)
 @click.option("-b", "--batch-size", help="Batch size for node insertion", default=100)
 @click.option("-e", "--embedding-dimension", help="Vector embedding dimensions", default=768)
 def main(

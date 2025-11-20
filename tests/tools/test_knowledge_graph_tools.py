@@ -16,9 +16,11 @@ class TestSearchSimilarPapers:
 
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
+    @patch.dict('os.environ', {
+        'NEO4J_URI': 'bolt://localhost:7687',
+        'NEO4J_USERNAME': 'neo4j',
+        'NEO4J_PASSWORD': 'llm_agents'
+    })
     def test_search_similar_papers_basic(self, mock_encode, mock_worker_class):
         """Test basic similarity search functionality."""
         # Mock the worker instance
@@ -64,9 +66,11 @@ class TestSearchSimilarPapers:
 
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
+    @patch.dict('os.environ', {
+        'NEO4J_URI': 'bolt://localhost:7687',
+        'NEO4J_USERNAME': 'neo4j',
+        'NEO4J_PASSWORD': 'llm_agents'
+    })
     def test_search_similar_papers_default_params(self, mock_encode, mock_worker_class):
         """Test search with default parameters."""
         mock_worker = Mock()
@@ -87,56 +91,58 @@ class TestSearchSimilarPapers:
     def test_search_uses_environment_variables(self):
         """Test that function uses environment variables for Neo4j connection."""
         import sys
-        
+        import importlib
+
         # Store original modules to restore later
         original_modules = {}
         modules_to_clear = [
             'llm_agents.tools.knowledge_graph',
             'llm_agents.tools.knowledge_graph.retriever'
         ]
-        
+
         for module in modules_to_clear:
             if module in sys.modules:
                 original_modules[module] = sys.modules[module]
                 del sys.modules[module]
-        
+
         try:
-            # Set custom environment variables and apply mocks before any import
-            # The key is to patch Neo4j driver to prevent actual connection
+            # Set custom environment variables FIRST, before any imports
             with patch.dict('os.environ', {
                 'NEO4J_URI': 'bolt://custom:7687',
-                'NEO4J_USERNAME': 'custom_user', 
+                'NEO4J_USERNAME': 'custom_user',
                 'NEO4J_PASSWORD': 'custom_pass'
-            }), \
+            }, clear=False), \
             patch('neo4j.GraphDatabase.driver') as mock_driver, \
             patch('toon_format.encode') as mock_encode, \
             patch('llm_agents.utils.embedding_generator.embedding') as mock_embedding:
-                
+
                 # Setup the Neo4j driver mock
                 mock_driver_instance = Mock()
                 mock_driver.return_value = mock_driver_instance
                 mock_driver_instance.verify_connectivity.return_value = True
-                
+
                 # Setup session mock to support context manager protocol
                 mock_session = Mock()
                 mock_session.__enter__ = Mock(return_value=mock_session)
                 mock_session.__exit__ = Mock(return_value=False)
-                
+
                 # Make session.run() return an iterable result (empty list)
                 mock_result = Mock()
                 mock_result.__iter__ = Mock(return_value=iter([]))  # Empty iterator
                 mock_session.run.return_value = mock_result
                 mock_driver_instance.session.return_value = mock_session
-                
+
                 # Mock embedding responses
                 mock_response = Mock()
                 mock_response.data = [{"embedding": [0.1, 0.2, 0.3]}]
                 mock_response.__getitem__ = lambda self, key: mock_response.data if key == "data" else None
                 mock_embedding.return_value = mock_response
-                
-                # Import with fresh environment variables
+
+                # Now import the module - it will read from patched environment
+                import llm_agents.tools.knowledge_graph
+                importlib.reload(llm_agents.tools.knowledge_graph)
                 from llm_agents.tools.knowledge_graph import search_similar_papers
-                
+
                 # Mock the search results
                 mock_encode.return_value = "result"
 
@@ -144,14 +150,14 @@ class TestSearchSimilarPapers:
                 result = search_similar_papers("test")
 
                 # Verify the driver was called with the correct environment variables
-                mock_driver.assert_called_once_with(
+                mock_driver.assert_called_with(
                     "bolt://custom:7687",
                     auth=("custom_user", "custom_pass")
                 )
-                
+
                 # Verify the result
                 assert result == "result"
-        
+
         finally:
             # Restore original modules to avoid interfering with other tests
             for module, original_module in original_modules.items():
@@ -164,9 +170,11 @@ class TestFindNeighboringPapers:
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
     @patch('llm_agents.tools.knowledge_graph.random.shuffle')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
+    @patch.dict('os.environ', {
+        'NEO4J_URI': 'bolt://localhost:7687',
+        'NEO4J_USERNAME': 'neo4j',
+        'NEO4J_PASSWORD': 'llm_agents'
+    })
     def test_find_neighboring_papers_basic(self, mock_shuffle, mock_encode, mock_worker_class):
         """Test basic neighborhood search functionality."""
         mock_worker = Mock()
@@ -212,9 +220,11 @@ class TestFindNeighboringPapers:
 
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
+    @patch.dict('os.environ', {
+        'NEO4J_URI': 'bolt://localhost:7687',
+        'NEO4J_USERNAME': 'neo4j',
+        'NEO4J_PASSWORD': 'llm_agents'
+    })
     def test_find_neighboring_papers_string_relationship_type(self, mock_encode, mock_worker_class):
         """Test that string relationship_type is converted to list."""
         mock_worker = Mock()
@@ -236,9 +246,11 @@ class TestFindNeighboringPapers:
 
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
+    @patch.dict('os.environ', {
+        'NEO4J_URI': 'bolt://localhost:7687',
+        'NEO4J_USERNAME': 'neo4j',
+        'NEO4J_PASSWORD': 'llm_agents'
+    })
     def test_find_neighboring_papers_defaults(self, mock_encode, mock_worker_class):
         """Test function with default parameters."""
         mock_worker = Mock()
@@ -260,9 +272,11 @@ class TestTraverseGraph:
 
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
+    @patch.dict('os.environ', {
+        'NEO4J_URI': 'bolt://localhost:7687',
+        'NEO4J_USERNAME': 'neo4j',
+        'NEO4J_PASSWORD': 'llm_agents'
+    })
     def test_traverse_graph_basic(self, mock_encode, mock_worker_class):
         """Test basic graph traversal functionality."""
         mock_worker = Mock()
@@ -310,9 +324,11 @@ class TestTraverseGraph:
 
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
+    @patch.dict('os.environ', {
+        'NEO4J_URI': 'bolt://localhost:7687',
+        'NEO4J_USERNAME': 'neo4j',
+        'NEO4J_PASSWORD': 'llm_agents'
+    })
     def test_traverse_graph_defaults(self, mock_encode, mock_worker_class):
         """Test graph traversal with default parameters."""
         mock_worker = Mock()
@@ -335,9 +351,11 @@ class TestTraverseGraph:
 
     @patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker')
     @patch('llm_agents.tools.knowledge_graph.toon_encode')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_DATABASE_URI', 'bolt://localhost:7687')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_USERNAME', 'neo4j')
-    @patch('llm_agents.tools.knowledge_graph.NEO4J_PASSWORD', 'llm_agents')
+    @patch.dict('os.environ', {
+        'NEO4J_URI': 'bolt://localhost:7687',
+        'NEO4J_USERNAME': 'neo4j',
+        'NEO4J_PASSWORD': 'llm_agents'
+    })
     def test_traverse_graph_optional_none_values(self, mock_encode, mock_worker_class):
         """Test graph traversal with None values for optional parameters."""
         mock_worker = Mock()
