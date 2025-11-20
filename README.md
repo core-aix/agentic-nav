@@ -1,5 +1,9 @@
 # LLMAgents - A collection of agents for doing scientific work
 
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+![Coverage](https://github.com/laminair/llm-agents/workflows/Tests/badge.svg)
+
+
 This repository contains code for an agent that can help you do related work for your next research project. 
 Given the sheer amount of new publications that are being published at major machine learning conferences, this agent
 can help browse papers, find similar papers, and help you write summaries to quickly get an overview of what is currently
@@ -175,3 +179,10 @@ At the moment, the web UI only supports Ollama models.
 The agent involves a set of asynchronous operations. We provide a built-in logging instance to capture all relevant logs 
 for debugging. To set the right debugging level for your application, you can use the environment variable `LLM_AGENTS_LOG_LEVEL`. 
 By default, it is set to `INFO`.
+
+#### Running tests
+We try to cover all tools and agent functionalities in thorough unit tests. 
+You can run them via: 
+```commandline
+uv run pytest tests/
+```
