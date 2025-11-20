@@ -10,7 +10,7 @@ from typing import List, Optional
 
 from llm_agents.tools.knowledge_graph.retriever import Neo4jGraphWorker, LOGGER
 
-NEO4J_DATABASE_URI = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_DB_URI = os.environ.get("NEO4J_DB_URI", "bolt://neo4j_db:7687")
 NEO4J_USERNAME = os.environ.get("NEO4J_USERNAME", "neo4j")
 NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD")
 
@@ -82,7 +82,7 @@ def search_similar_papers(
         min_similarity = float(min_similarity)
 
     worker = Neo4jGraphWorker(
-        uri=NEO4J_DATABASE_URI,
+        uri=NEO4J_DB_URI,
         username=NEO4J_USERNAME,
         password=NEO4J_PASSWORD
     )
@@ -173,7 +173,7 @@ def find_neighboring_papers(
         relationship_types = [relationship_types]
 
     worker = Neo4jGraphWorker(
-        uri=NEO4J_DATABASE_URI,
+        uri=NEO4J_DB_URI,
         username=NEO4J_USERNAME,
         password=NEO4J_PASSWORD
     )
@@ -269,7 +269,7 @@ def traverse_graph(
         random_seed = int(random_seed)
 
     worker = Neo4jGraphWorker(
-        uri=NEO4J_DATABASE_URI,
+        uri=NEO4J_DB_URI,
         username=NEO4J_USERNAME,
         password=NEO4J_PASSWORD
     )
