@@ -26,6 +26,7 @@ LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 NEO4J_USERNAME = os.environ.get("NEO4J_USERNAME", "neo4j")
 NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD")
+NEO4J_DB_URI = os.environ.get("NEO4J_DB_URI", "bolt://neo4j_db:7687")
 
 
 class Neo4jImporter:
@@ -33,7 +34,7 @@ class Neo4jImporter:
 
     def __init__(
             self,
-            uri: str = "bolt://localhost:7687",
+            uri: str = NEO4J_DB_URI,
             username: str = NEO4J_USERNAME,
             password: str = NEO4J_PASSWORD
     ):
@@ -477,15 +478,15 @@ class Neo4jImporter:
 @click.command()
 @click.option("-g", "--graph-path", help="Path to the knowledge graph file (pickle).", default=f"{PROJECT_ROOT}/graphs/knowledge_graph.pkl")
 @click.option("-l", "--neo4j-uri", help="Database URI", default="bolt://localhost:7687")
-@click.option("-u", "--neo4j-username", help="Database user", default="neo4j")
-@click.option("-p", "--neo4j-password", help="Database password")
+@click.option("-u", "--neo4j-username", help="Database user", default=NEO4J_USERNAME)
+@click.option("-p", "--neo4j-password", help="Database password", default=NEO4J_PASSWORD)
 @click.option("-b", "--batch-size", help="Batch size for node insertion", default=100)
 @click.option("-e", "--embedding-dimension", help="Vector embedding dimensions", default=768)
 def main(
     graph_path: str,
-    neo4j_uri: str = "bolt://localhost:7687",
-    neo4j_username: str = "neo4j",
-    neo4j_password: str = "password",
+    neo4j_uri: str,
+    neo4j_username: str,
+    neo4j_password: str,
     batch_size: int = 100,
     embedding_dimension: int = 768
 ):
