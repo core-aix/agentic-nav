@@ -16,14 +16,17 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class LLMAgent:
-    model: str = f"ollama_chat/gpt-oss:20b",
-    api_base: str = "http://localhost:11434",
-    api_key: str = None,
-    llm_args: dict = field(default_factory=lambda: {"temperature": 0.2, "max_tokens": 6000, "num_ctx": 131072}),
+    model: str = "ollama_chat/gpt-oss:20b"
+    api_base: str = "http://localhost:11434"
+    api_key: str = None
+    llm_args: dict = field(default_factory=lambda: {"temperature": 0.2, "max_tokens": 6000, "num_ctx": 131072})
     tools: List[callable] = field(default_factory=lambda: get_all_tools())
     global_tool_args: dict = field(default_factory=lambda: {"max_num_papers": 10})
     max_interaction_rounds: int = 10
     messages: List[Dict] = field(default_factory=lambda: [])
+    tool_registry: Dict = None
+    tool_descriptions: List = None
+    default_system_prompt: Dict[str, str] = None
 
     def test_llm_connection(self):
         try:
@@ -47,9 +50,15 @@ class LLMAgent:
         LOGGER.info(f"Agent setup and tools ready to use.")
         LOGGER.debug(f"Available tools: {self.tools}")
 
+    def remove_session(self):
+        """De-registers tools and resets messages to the initial state."""
+        self.tool_registry = None
+        self.tool_descriptions = None
+        self.messages = [self.default_system_prompt if not None else {"role": "system", "content": "You are a helpful assistant."}]
+
     def interact(self, message: Dict):
-        assert self.tool_registry is not None, "Make sure to call 'setup_agent()' before the first interaction."
-        assert self.tool_descriptions is not None, "Make sure to call 'setup_agent()' before the first interaction."
+        assert self.tool_registry is not None, "Make sure to call 'setup_session()' before the first interaction."
+        assert self.tool_descriptions is not None, "Make sure to call 'setup_session()' before the first interaction."
 
         assert type(message) == dict, "Make sure to pass a dictionary as next message for the agent."
         assert "role" in message.keys(), "The message must contain a 'role' key."
@@ -84,6 +93,7 @@ class LLMAgent:
                     )
                 )
 
+        print(f"MESSAGES: {self.messages}")
         return self.messages
 
     def interact_stateless(
@@ -97,8 +107,8 @@ class LLMAgent:
         """
         This method is designed to support multi-user sessions and requires state management outside the agent class.
         """
-        assert self.tool_registry is not None, "Make sure to call 'setup_agent()' before the first interaction."
-        assert self.tool_descriptions is not None, "Make sure to call 'setup_agent()' before the first interaction."
+        assert self.tool_registry is not None, "Make sure to call 'setup_session()' before the first interaction."
+        assert self.tool_descriptions is not None, "Make sure to call 'setup_session()' before the first interaction."
 
         # Sanity check for all messages
         for message in messages:
@@ -183,32 +193,6 @@ class LLMAgent:
                 yield messages.copy()
 
         yield messages
-        # for _ in range(self.max_interaction_rounds):
-        #     collected, calls = self._send_to_llm(
-        #         messages=messages,
-        #         model=model,
-        #         api_base=api_base,
-        #         api_key=api_key,
-        #         llm_args=llm_args
-        #     )
-        #     messages.append({"role": "assistant", "content": collected, "_ts": str(datetime.now(UTC))})
-        #     LOGGER.debug(f"Agent response: {collected}")
-        #
-        #     if not calls:
-        #         return messages
-        #     else:
-        #         messages[-1]["tool_calls"] = calls
-        #         LOGGER.debug(f"Agent requested tool calls: {calls}")
-        #
-        #     # execute tools and append results
-        #     for call in calls:
-        #         messages.append(
-        #             self.call_tool(
-        #                 tool_call=call
-        #             )
-        #         )
-        #
-        # return messages
 
     def _send_to_llm(
         self,

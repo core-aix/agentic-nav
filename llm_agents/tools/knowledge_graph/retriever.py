@@ -313,6 +313,10 @@ class Neo4jGraphWorker:
                 max_results,
                 max_branches or 3
             )
+        
+        else:
+            raise ValueError(f"Unsupported traversal strategy: {strategy}. "
+                           f"Supported strategies: breadth_first, depth_first, breadth_first_random, depth_first_random")
 
     def combined_search_workflow(
             self,

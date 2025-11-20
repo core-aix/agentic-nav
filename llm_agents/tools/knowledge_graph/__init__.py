@@ -8,8 +8,7 @@ import random
 from toon_format import encode as toon_encode
 from typing import List, Optional
 
-from llm_agents.tools.knowledge_graph.retriever import Neo4jGraphWorker
-
+from llm_agents.tools.knowledge_graph.retriever import Neo4jGraphWorker, LOGGER
 
 NEO4J_DB_URI = os.environ.get("NEO4J_DB_URI", "bolt://neo4j_db:7687")
 NEO4J_USERNAME = os.environ.get("NEO4J_USERNAME", "neo4j")
@@ -17,9 +16,9 @@ NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD")
 
 
 def search_similar_papers(
-    user_query: str,
-    num_papers_to_return: int = 10,
-    min_similarity: float = None
+        user_query: str,
+        num_papers_to_return: int = 10,
+        min_similarity: float = None
 ) -> str:
     """
     Search for research papers semantically similar to a user's natural language query.
@@ -76,6 +75,12 @@ def search_similar_papers(
         ...     min_similarity=0.75
         ... )
     """
+    # Type coercion for parameters that may come as strings from LLM tool calls
+    if num_papers_to_return is not None and not isinstance(num_papers_to_return, int):
+        num_papers_to_return = int(num_papers_to_return)
+    if min_similarity is not None and not isinstance(min_similarity, float):
+        min_similarity = float(min_similarity)
+
     worker = Neo4jGraphWorker(
         uri=NEO4J_DB_URI,
         username=NEO4J_USERNAME,
@@ -96,10 +101,10 @@ def search_similar_papers(
 
 
 def find_neighboring_papers(
-    paper_id: str,
-    relationship_types: List[str] = ["SIMILAR_TO"],
-    neighbor_entity: str = "similar_papers",
-    num_neighbors_to_return: int = 10
+        paper_id: str,
+        relationship_types: List[str] = ["SIMILAR_TO"],
+        neighbor_entity: str = "similar_papers",
+        num_neighbors_to_return: int = 10
 ) -> str:
     """
     Retrieve immediate neighboring entities of a specific paper from the Neo4j knowledge graph.
@@ -160,6 +165,9 @@ def find_neighboring_papers(
         ...     num_neighbors_to_return=3
         ... )
     """
+    # Type coercion for parameters that may come as strings from LLM tool calls
+    if num_neighbors_to_return is not None and not isinstance(num_neighbors_to_return, int):
+        num_neighbors_to_return = int(num_neighbors_to_return)
 
     if type(relationship_types) is str:
         relationship_types = [relationship_types]
@@ -184,7 +192,8 @@ def find_neighboring_papers(
     # Constrain and shuffle neighbors for more diverse responses
     random.shuffle(relevant_neighbors)
 
-    if num_neighbors_to_return is not None and type(relevant_neighbors) is int:
+    # FIX: Changed type(relevant_neighbors) to type(num_neighbors_to_return)
+    if num_neighbors_to_return is not None and isinstance(num_neighbors_to_return, int):
         relevant_neighbors = relevant_neighbors[:num_neighbors_to_return]
 
     # Format outputs to be more token efficient
@@ -194,13 +203,13 @@ def find_neighboring_papers(
 
 
 def traverse_graph(
-    start_paper_id: str,
-    n_hops: int = 2,
-    relationship_type: Optional[str] = "BELONGS_TO_TOPIC",
-    max_results: Optional[int] = 30,
-    strategy: str = "breadth_first_random",
-    max_branches: Optional[int] = 2,
-    random_seed: Optional[int] = 42
+        start_paper_id: str,
+        n_hops: int = 2,
+        relationship_type: Optional[str] = "BELONGS_TO_TOPIC",
+        max_results: Optional[int] = 30,
+        strategy: str = "breadth_first_random",
+        max_branches: Optional[int] = 2,
+        random_seed: Optional[int] = 42
 ) -> str:
     """
     Traverse a Neo4j knowledge graph to discover related research papers through various relationship types.
@@ -249,6 +258,16 @@ def traverse_graph(
         ...     strategy="breadth_first_random"
         ... )
     """
+    # Type coercion for parameters that may come as strings from LLM tool calls
+    if n_hops is not None and not isinstance(n_hops, int):
+        n_hops = int(n_hops)
+    if max_results is not None and not isinstance(max_results, int):
+        max_results = int(max_results)
+    if max_branches is not None and not isinstance(max_branches, int):
+        max_branches = int(max_branches)
+    if random_seed is not None and not isinstance(random_seed, int):
+        random_seed = int(random_seed)
+
     worker = Neo4jGraphWorker(
         uri=NEO4J_DB_URI,
         username=NEO4J_USERNAME,
