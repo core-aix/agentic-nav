@@ -1,7 +1,7 @@
 # LLMAgents - A collection of agents for doing scientific work
 
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
-![Coverage](https://github.com/laminair/llm-agents/workflows/Tests/badge.svg)
+![Coverage](https://github.com/shiqiangw/llm-agents/workflows/Tests/badge.svg)
 
 
 This repository contains code for an agent that can help you do related work for your next research project. 
