@@ -14,6 +14,7 @@ import click
 import os
 import datetime
 import logging
+import litellm
 from pathlib import Path
 from typing import Optional
 
@@ -45,6 +46,7 @@ AGENT_MODEL_NAME = os.environ.get("AGENT_MODEL_NAME", "gpt-oss:20b")
 AGENT_MODEL_API_BASE = os.environ.get("AGENT_MODEL_API_BASE", "http://localhost:11436")
 OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY")
 
+litellm._logging._disable_debugging()
 console = Console(soft_wrap=True)
 
 # Command completer for auto-complete
@@ -206,6 +208,8 @@ def main(temperature, max_tokens, num_ctx, max_num_papers):
 
     # Config for the LLM messages
     llm_config = {
+        "model": f"ollama_chat/{AGENT_MODEL_NAME}",
+        "api_base": AGENT_MODEL_API_BASE,
         "temperature": temperature,
         "max_tokens": max_tokens,
         "num_ctx": num_ctx
@@ -220,7 +224,7 @@ def main(temperature, max_tokens, num_ctx, max_num_papers):
 
     # Initialize agent
     agent = NeurIPS2025Agent(
-        model=f"ollama_chat/{AGENT_MODEL_NAME}",
+        # model=f"ollama_chat/{AGENT_MODEL_NAME}",
         api_base=AGENT_MODEL_API_BASE,
         api_key=OLLAMA_API_KEY,
         llm_args=llm_config,

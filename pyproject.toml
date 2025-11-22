@@ -1,7 +1,7 @@
 [project]
 name = "llm-agents"
 version = "0.1.0"
-description = "A package containing versatile tooling for doing related work analysis on AI research."
+description = "A package containing versatile tooling for doing related work analysis and planning conference visits in the AI research space."
 readme = "README.md"
 authors = [
     {name = "Shiqiang Wang", email = "s.wang9@exeter.ac.uk"},
@@ -59,5 +59,5 @@ dev = [
 packages = ["llm_agents"]
 
 [project.scripts]
-llm-agents-cli = "llm_agents.frontend.cli:main"
-llm-agents-web = "llm_agents.frontend.browser_ui:main"
+agentic-nav-cli = "llm_agents.frontend.cli:main"
+agentic-nav-web = "llm_agents.frontend.browser_ui:main"

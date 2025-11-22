@@ -28,7 +28,19 @@ class LLMAgent:
     tool_descriptions: List = None
     default_system_prompt: Dict[str, str] = None
 
+    def __remove_model_key_from_llm_args(self, stateful: bool = True):
+        if stateful:
+            self.model = self.llm_args["model"]
+            self.api_base = self.llm_args["api_base"]
+
+        if "model" in self.llm_args.keys():
+            del self.llm_args["model"]
+
+        if "api_base" in self.llm_args.keys():
+            del self.llm_args["api_base"]
+
     def test_llm_connection(self):
+        self.__remove_model_key_from_llm_args(stateful=True)
         try:
             response = litellm.completion(
                 model=self.model,
@@ -64,6 +76,7 @@ class LLMAgent:
         assert "role" in message.keys(), "The message must contain a 'role' key."
         assert "content" in message.keys(), "The message must contain a 'content' key."
 
+        self.__remove_model_key_from_llm_args(stateful=True)
         if "_ts" not in message.keys():
             message["_ts"] = str(datetime.now(UTC))
 
@@ -109,6 +122,7 @@ class LLMAgent:
         """
         assert self.tool_registry is not None, "Make sure to call 'setup_session()' before the first interaction."
         assert self.tool_descriptions is not None, "Make sure to call 'setup_session()' before the first interaction."
+        self.__remove_model_key_from_llm_args(stateful=False)
 
         # Sanity check for all messages
         for message in messages:

@@ -36,6 +36,16 @@ class Neo4jGraphWorker:
                node.abstract as abstract,
                node.topic as topic,
                node.paper_url as paper_url, 
+               node.session as session,
+               node.session_start_time as session_start_time,
+               node.session_end_time as session_end_time,
+               node.presentation_type as presentation_type,
+               node.room_name as room_name,
+               node.project_url as project_url,
+               node.poster_position as poster_position,
+               node.sourceid as sourceid,
+               node.virtualsite_url as virtualsite_url,
+               node.decision as decision,
                score
         ORDER BY score DESC
         """
@@ -60,6 +70,16 @@ class Neo4jGraphWorker:
                p.abstract as abstract,
                p.topic as topic,
                p.paper_url as paper_url,
+               p.decision as decision,
+               p.session as session,
+               p.session_start_time as session_start_time,
+               p.session_end_time as session_end_time,
+               p.presentation_type as presentation_type,
+               p.room_name as room_name,
+               p.project_url as project_url,
+               p.poster_position as poster_position,
+               p.sourceid as sourceid,
+               p.virtualsite_url as virtualsite_url,
                a.fullname as author_name
         ORDER BY p.name
         """
@@ -72,6 +92,16 @@ class Neo4jGraphWorker:
                p.abstract as abstract,
                p.topic as topic,
                p.paper_url as paper_url,
+               p.decision as decision,
+               p.session as session,
+               p.session_start_time as session_start_time,
+               p.session_end_time as session_end_time,
+               p.presentation_type as presentation_type,
+               p.room_name as room_name,
+               p.project_url as project_url,
+               p.poster_position as poster_position,
+               p.sourceid as sourceid,
+               p.virtualsite_url as virtualsite_url,
                a.fullname as author_name
         ORDER BY p.name
         """
@@ -82,7 +112,17 @@ class Neo4jGraphWorker:
                p.name as name,
                p.abstract as abstract,
                p.topic as topic,
-               p.paper_url as paper_url
+               p.paper_url as paper_url,
+               p.decision as decision,
+               p.session as session,
+               p.session_start_time as session_start_time,
+               p.session_end_time as session_end_time,
+               p.presentation_type as presentation_type,
+               p.room_name as room_name,
+               p.project_url as project_url,
+               p.poster_position as poster_position,
+               p.sourceid as sourceid,
+               p.virtualsite_url as virtualsite_url,
         ORDER BY p.name
         """
 
@@ -97,6 +137,16 @@ class Neo4jGraphWorker:
                p.abstract as abstract,
                p.topic as topic,
                p.paper_url as paper_url,
+               p.decision as decision,
+               p.session as session,
+               p.session_start_time as session_start_time,
+               p.session_end_time as session_end_time,
+               p.presentation_type as presentation_type,
+               p.room_name as room_name,
+               p.project_url as project_url,
+               p.poster_position as poster_position,
+               p.sourceid as sourceid,
+               p.virtualsite_url as virtualsite_url,
         ORDER BY p.name
         """
 
@@ -108,6 +158,16 @@ class Neo4jGraphWorker:
                p2.abstract as abstract,
                p2.topic as topic,
                p2.paper_url as paper_url,
+               p2.decision as decision,
+               p2.session as session,
+               p2.session_start_time as session_start_time,
+               p2.session_end_time as session_end_time,
+               p2.presentation_type as presentation_type,
+               p2.room_name as room_name,
+               p2.project_url as project_url,
+               p2.poster_position as poster_position,
+               p2.sourceid as sourceid,
+               p2.virtualsite_url as virtualsite_url,
                r.similarity as similarity
         ORDER BY r.similarity DESC
         LIMIT $top_k
@@ -180,7 +240,17 @@ class Neo4jGraphWorker:
                     'abstract': record['abstract'],
                     'topic': record['topic'],
                     'similarity_score': record['score'],
-                    'paper_url': record['paper_url']
+                    'paper_url': record['paper_url'],
+                    'decision': record['decision'],
+                    'session': record['session'],
+                    'session_start_time': record['session_start_time'],
+                    'session_end_time': record['session_end_time'],
+                    'presentation_type': record['presentation_type'],
+                    'room_name': record['room_name'],
+                    'github_url': record['project_url'],
+                    'poster_position': record['poster_position'],
+                    'sourceid': record['sourceid'],
+                    'virtualsite_url': record['virtualsite_url'],
                 }
 
                 # Apply minimum similarity filter if specified
@@ -424,7 +494,18 @@ class Neo4jGraphWorker:
                     'name': record['name'],
                     'abstract': record['abstract'],
                     'topic': record['topic'],
-                    'author_name': record['author_name']
+                    'author_name': record['author_name'],
+                    'paper_url': record['paper_url'],
+                    'decision': record['decision'],
+                    'session': record['session'],
+                    'session_start_time': record['session_start_time'],
+                    'session_end_time': record['session_end_time'],
+                    'presentation_type': record['presentation_type'],
+                    'room_name': record['room_name'],
+                    'github_url': record['project_url'],
+                    'poster_position': record['poster_position'],
+                    'sourceid': record['sourceid'],
+                    'virtualsite_url': record['virtualsite_url'],
                 }
                 papers.append(paper)
 
@@ -461,7 +542,17 @@ class Neo4jGraphWorker:
                     'name': record['name'],
                     'abstract': record['abstract'],
                     'topic': record['topic'],
-                    'paper_url': record['paper_url']
+                    'paper_url': record['paper_url'],
+                    'decision': record['decision'],
+                    'session': record['session'],
+                    'session_start_time': record['session_start_time'],
+                    'session_end_time': record['session_end_time'],
+                    'presentation_type': record['presentation_type'],
+                    'room_name': record['room_name'],
+                    'github_url': record['project_url'],
+                    'poster_position': record['poster_position'],
+                    'sourceid': record['sourceid'],
+                    'virtualsite_url': record['virtualsite_url'],
                 }
                 papers.append(paper)
 
