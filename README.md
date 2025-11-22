@@ -127,9 +127,9 @@ uv run llm_agents/tools/knowledge_graph/graph_generator.py \
     --ollama-server-url $EMBEDDING_MODEL_API_BASE \
     --embedding-gen-batch-size 32 \
     --max-parallel-workers 28 \
-    --similarity-threshold 0.8 \
+    --similarity-threshold 0.6 \
     --output-file graphs/knowledge_graph.pkl \
-    # --limit-num-papers  # Optional
+    # --limit-num-papers  # Optional 
 ```
 **Important note:** Generating the full graph for over 6k papers can take more than 1 hour. You can find a set of pre-generated 
 knowledge graphs here (the "thresh" in the file name indicates the `similarity-threshold` for which we create a `similar_to` relationship between papers): [LRZ Sync+Share](https://syncandshare.lrz.de/getlink/fiFMhMLLH7FaQ3Jipqqsye/)

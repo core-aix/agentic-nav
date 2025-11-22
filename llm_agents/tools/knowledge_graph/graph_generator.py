@@ -150,6 +150,9 @@ class PaperKnowledgeGraph:
             room_name = paper.get("room_name", "")
             project_url = paper.get("url", "")
             poster_position = paper.get("poster_position", "")
+            paper_url = paper.get("paper_url", "")
+            sourceid = paper.get("sourceid", "")
+            virtualsite_url = paper.get("virtualsite_url", "")
 
             paper_info.append({
                 "id": paper_id,
@@ -165,7 +168,10 @@ class PaperKnowledgeGraph:
                 "presentation_type": presentation_type,
                 "room_name": room_name,
                 "project_url": project_url,
-                "poster_position": poster_position
+                "poster_position": poster_position,
+                "paper_url": paper_url,
+                "sourceid": sourceid,
+                "virtualsite_url": virtualsite_url
 
             })
             abstracts.append(abstract)
@@ -382,7 +388,7 @@ class PaperKnowledgeGraph:
 @click.option("-l", "--ollama-server-url", default="http://localhost:11434")
 @click.option("-b", "--embedding-gen-batch-size", default=32)
 @click.option("-w", "--max-parallel-workers", default=16)
-@click.option("-p", "--limit-num-papers", default=None)
+@click.option("-p", "--limit-num-papers", default=None, type=int)
 @click.option("-f", "--input-json-file", default=f"{PROJECT_ROOT}/data/neurips-2025-orals-posters.json")
 @click.option("-o", "--output-file", default=f"{PROJECT_ROOT}/graphs/knowledge_graph.pkl")
 @click.option("-s", "--similarity-threshold", default=0.8)
