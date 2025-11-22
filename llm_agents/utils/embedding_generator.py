@@ -2,21 +2,76 @@ import logging
 
 import litellm
 import numpy as np
+import spaces
 
 from litellm import embedding
+from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
 from typing import List
 
 
 LOGGER = logging.getLogger(__name__)
+local_embedding_model = None
+
+
+class EmbeddingResponse:
+    def __init__(self, embeddings):
+        self.data = [
+            type('obj', (), {
+                'embedding': emb.tolist(),
+                'index': idx
+            })()
+            for idx, emb in enumerate(embeddings)
+        ]
+
+@spaces.GPU
+def embed_hf_spaces(model, input, embedding_model_name: str = "nomic-ai/nomic-embed-text-v1.5", api_base=None, **kwargs):
+    """
+    Drop-in replacement for litellm.embedding()
+
+    Args:
+        model: Model name (ignored since we use the loaded model)
+        input: Single string or list of strings to embed
+        api_base: Ignored for local embedding
+        **kwargs: Additional args like num_ctx (ignored for local)
+
+    Returns:
+        Object with same structure as LiteLLM response
+    """
+    global local_embedding_model
+    local_embedding_model = SentenceTransformer(
+        embedding_model_name,
+        trust_remote_code=True
+    )
+
+    texts = [input] if isinstance(input, str) else input
+    embeddings = model.encode(
+        texts,
+        convert_to_tensor=True,
+        show_progress_bar=False,
+        normalize_embeddings=True
+    )
+
+    embeddings_np = embeddings.cpu().numpy()
+
+    return EmbeddingResponse(embeddings_np)
+
+
+def embedding_fn(model, input, api_base, **kwargs):
+    if api_base == "hf_spaces_local":
+        embed_hf_spaces(input=input, embedding_model_name=model, api_base=api_base, **kwargs)
+    elif api_base == "http://localhost:11435" or api_base == "https://ollama.com":
+        return embed_hf_spaces(input=input, embedding_model_name=model, api_base=api_base, **kwargs)
+    else:
+        raise NotImplementedError("Unknown api_base for provider {api_base}. Available options: hf_spaces_local, ollama local (http://localhost:11435), ollama cloud (https://ollama.com)")
 
 
 def batch_embed_documents(
     texts: List[str],
     batch_size: int = 1,
     embedding_model: str = f"ollama/nomic-embed-text",
-    api_base: str = "http://localhost:11435"
+    api_base: str = "http://localhost:11435",
 ) -> np.ndarray:
 
     if not texts:
@@ -30,7 +85,7 @@ def batch_embed_documents(
     for i in tqdm(range(0, len(texts), batch_size)):
         chunk = texts[i:i + batch_size]
         try:
-            resp = embedding(
+            resp = embedding_fn(
                 model=embedding_model,
                 input=chunk,
                 api_base=api_base,
