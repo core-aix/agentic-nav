@@ -25,28 +25,38 @@ class EmbeddingResponse:
             for idx, emb in enumerate(embeddings)
         ]
 
+
+def _get_local_model(embedding_model_name: str = "nomic-ai/nomic-embed-text-v1.5"):
+    """Lazy load the embedding model only once"""
+    global local_embedding_model
+    if local_embedding_model is None:
+        LOGGER.info(f"Loading embedding model: {embedding_model_name}")
+        local_embedding_model = SentenceTransformer(
+            embedding_model_name,
+            trust_remote_code=True
+        )
+    return local_embedding_model
+
+
 @spaces.GPU
-def embed_hf_spaces(model, input, embedding_model_name: str = "nomic-ai/nomic-embed-text-v1.5", api_base=None, **kwargs):
+def embed_hf_spaces(input, embedding_model_name: str = "nomic-ai/nomic-embed-text-v1.5", api_base=None, **kwargs):
     """
     Drop-in replacement for litellm.embedding()
 
     Args:
-        model: Model name (ignored since we use the loaded model)
         input: Single string or list of strings to embed
+        embedding_model_name: HuggingFace model name to use
         api_base: Ignored for local embedding
         **kwargs: Additional args like num_ctx (ignored for local)
 
     Returns:
         Object with same structure as LiteLLM response
     """
-    global local_embedding_model
-    local_embedding_model = SentenceTransformer(
-        embedding_model_name,
-        trust_remote_code=True
-    )
+    # Get model (loads only on first call)
+    model_instance = _get_local_model(embedding_model_name)
 
     texts = [input] if isinstance(input, str) else input
-    embeddings = model.encode(
+    embeddings = model_instance.encode(
         texts,
         convert_to_tensor=True,
         show_progress_bar=False,
@@ -64,14 +74,14 @@ def embedding_fn(model, input, api_base, **kwargs):
     elif "localhost" in api_base or "ollama.com" in api_base:
         return embedding(input=input, model=model, api_base=api_base, **kwargs)
     else:
-        raise NotImplementedError("Unknown api_base for provider {api_base}. Available options: hf_spaces_local, ollama local (http://localhost:11435), ollama cloud (https://ollama.com)")
+        raise NotImplementedError(f"Unknown api_base for provider {api_base}. Available options: hf_spaces_local, ollama local (http://localhost:11435), ollama cloud (https://ollama.com)")
 
 
 def batch_embed_documents(
-    texts: List[str],
-    batch_size: int = 1,
-    embedding_model: str = f"ollama/nomic-embed-text",
-    api_base: str = "http://localhost:11435",
+        texts: List[str],
+        batch_size: int = 1,
+        embedding_model: str = "nomic-ai/nomic-embed-text-v1.5",
+        api_base: str = "hf_spaces_local",
 ) -> np.ndarray:
 
     if not texts:
@@ -110,14 +120,14 @@ def batch_embed_documents(
                 ctr += 1
 
             LOGGER.debug(f"Single sample response from embedding model: {individual_responses}")
-            
+
             # Extract embeddings from individual responses
             for individual_resp in individual_responses:
-                vecs.extend([d["embedding"] for d in individual_resp["data"]])
+                vecs.extend([d["embedding"] for d in individual_resp.data])
         else:
             # Normal batch processing
-            vecs.extend([d["embedding"] for d in resp["data"]])
-        # time.sleep(5)  # avoid rate limit
+            vecs.extend([d["embedding"] for d in resp.data])
+
     arr = np.array(vecs, dtype="float32")
     # cosine similarity: normalize to unit length and use IndexFlatIP
     norms = np.linalg.norm(arr, axis=1, keepdims=True) + 1e-12
@@ -133,5 +143,8 @@ if __name__ == "__main__":
             "test4",
             "test5"
         ],
-        batch_size=1
+        batch_size=2,
+        embedding_model="ollama/nomic-embed-text",
+        api_base="http://localhost:11435"
     )
+    print(f"Result shape: {res.shape}")

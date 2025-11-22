@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch, Mock
 
-from llm_agents.utils.logging import setup_logging
+from llm_agents.utils.logger import setup_logging
 
 
 class TestSetupLogging:

@@ -31,7 +31,7 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.formatted_text import HTML
 
 from llm_agents.agents import NeurIPS2025Agent
-from llm_agents.utils.logging import setup_logging
+from llm_agents.utils.logger import setup_logging
 from llm_agents.utils.file_handlers import save_chat_history
 from llm_agents.utils.cli import open_editor, show_history, print_help
 

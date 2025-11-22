@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import List, Tuple, Optional, Dict
 
 from llm_agents.agents import NeurIPS2025Agent, DEFAULT_NEURIPS2025_AGENT_ARGS
-from llm_agents.utils.logging import setup_logging
+from llm_agents.utils.logger import setup_logging
 from llm_agents.utils.file_handlers import save_chat_history
 
 

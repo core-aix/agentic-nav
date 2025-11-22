@@ -31,6 +31,8 @@ class Neo4jGraphWorker:
     _DB_SIMILARITY_SEARCH_QUERY = """
         CALL db.index.vector.queryNodes('paper_embeddings', $top_k, $query_embedding)
         YIELD node, score
+        OPTIONAL MATCH (a:Author)-[:IS_AUTHOR_OF]->(node)
+        WITH node, score, collect(a) as authors
         RETURN node.id as id,
                node.name as name,
                node.abstract as abstract,
@@ -46,6 +48,7 @@ class Neo4jGraphWorker:
                node.sourceid as sourceid,
                node.virtualsite_url as virtualsite_url,
                node.decision as decision,
+               authors, 
                score
         ORDER BY score DESC
         """
@@ -63,7 +66,7 @@ class Neo4jGraphWorker:
 
     # Find the DB query for graph traversal in the graph_traversal sub-folder.
     _DB_PAPERS_BY_AUTHOR = """
-        MATCH (p:Paper)-[:AUTHORED_BY]->(a:Author)
+        MATCH (a:Author)-[:IS_AUTHOR_OF]->(p:Paper)
         WHERE a.fullname = $author_name
         RETURN p.id as id,
                p.name as name,
@@ -251,6 +254,7 @@ class Neo4jGraphWorker:
                     'poster_position': record['poster_position'],
                     'sourceid': record['sourceid'],
                     'virtualsite_url': record['virtualsite_url'],
+                    'authors': [a['fullname'] for a in record['authors']]
                 }
 
                 # Apply minimum similarity filter if specified
