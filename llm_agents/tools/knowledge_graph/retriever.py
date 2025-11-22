@@ -35,6 +35,7 @@ class Neo4jGraphWorker:
                node.name as name,
                node.abstract as abstract,
                node.topic as topic,
+               node.paper_url as paper_url, 
                score
         ORDER BY score DESC
         """
@@ -58,6 +59,7 @@ class Neo4jGraphWorker:
                p.name as name,
                p.abstract as abstract,
                p.topic as topic,
+               p.paper_url as paper_url,
                a.fullname as author_name
         ORDER BY p.name
         """
@@ -69,6 +71,7 @@ class Neo4jGraphWorker:
                p.name as name,
                p.abstract as abstract,
                p.topic as topic,
+               p.paper_url as paper_url,
                a.fullname as author_name
         ORDER BY p.name
         """
@@ -78,7 +81,8 @@ class Neo4jGraphWorker:
         RETURN p.id as id,
                p.name as name,
                p.abstract as abstract,
-               p.topic as topic
+               p.topic as topic,
+               p.paper_url as paper_url
         ORDER BY p.name
         """
 
@@ -91,7 +95,8 @@ class Neo4jGraphWorker:
         RETURN DISTINCT p.id as id,
                p.name as name,
                p.abstract as abstract,
-               p.topic as topic
+               p.topic as topic,
+               p.paper_url as paper_url,
         ORDER BY p.name
         """
 
@@ -102,6 +107,7 @@ class Neo4jGraphWorker:
                p2.name as name,
                p2.abstract as abstract,
                p2.topic as topic,
+               p2.paper_url as paper_url,
                r.similarity as similarity
         ORDER BY r.similarity DESC
         LIMIT $top_k
@@ -167,14 +173,17 @@ class Neo4jGraphWorker:
         with self.driver.session() as session:
             result = session.run(self._DB_SIMILARITY_SEARCH_QUERY, query_embedding=query_embedding, top_k=top_k)
 
+            print(self.driver.get_server_info().address)
             papers = []
             for record in result:
+                print(record)
                 paper = {
                     'id': record['id'],
                     'name': record['name'],
                     'abstract': record['abstract'],
                     'topic': record['topic'],
-                    'similarity_score': record['score']
+                    'similarity_score': record['score'],
+                    'paper_url': record['paper_url']
                 }
 
                 # Apply minimum similarity filter if specified
@@ -454,7 +463,8 @@ class Neo4jGraphWorker:
                     'id': record['id'],
                     'name': record['name'],
                     'abstract': record['abstract'],
-                    'topic': record['topic']
+                    'topic': record['topic'],
+                    'paper_url': record['paper_url']
                 }
                 papers.append(paper)
 

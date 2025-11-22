@@ -27,6 +27,7 @@ dependencies = [
     "pyvis>=0.3.2",
     "rich>=13.0.0",
     "sentence-transformers>=5.1.2",
+    "spaces>=0.42.1",
     "toon-format",
     "typer>=0.20.0",
 ]

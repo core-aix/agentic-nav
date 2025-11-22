@@ -60,9 +60,9 @@ def embed_hf_spaces(model, input, embedding_model_name: str = "nomic-ai/nomic-em
 
 def embedding_fn(model, input, api_base, **kwargs):
     if api_base == "hf_spaces_local":
-        embed_hf_spaces(input=input, embedding_model_name=model, api_base=api_base, **kwargs)
-    elif api_base == "http://localhost:11435" or api_base == "https://ollama.com":
         return embed_hf_spaces(input=input, embedding_model_name=model, api_base=api_base, **kwargs)
+    elif "localhost" in api_base or "ollama.com" in api_base:
+        return embedding(input=input, model=model, api_base=api_base, **kwargs)
     else:
         raise NotImplementedError("Unknown api_base for provider {api_base}. Available options: hf_spaces_local, ollama local (http://localhost:11435), ollama cloud (https://ollama.com)")
 
@@ -98,7 +98,7 @@ def batch_embed_documents(
             for sample in chunk:
                 try:
                     individual_responses.append(
-                        embedding(
+                        embedding_fn(
                             model=embedding_model,
                             input=sample,
                             api_base=api_base,
