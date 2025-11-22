@@ -172,11 +172,8 @@ class Neo4jGraphWorker:
 
         with self.driver.session() as session:
             result = session.run(self._DB_SIMILARITY_SEARCH_QUERY, query_embedding=query_embedding, top_k=top_k)
-
-            print(self.driver.get_server_info().address)
             papers = []
             for record in result:
-                print(record)
                 paper = {
                     'id': record['id'],
                     'name': record['name'],
