@@ -82,6 +82,7 @@ def batch_embed_documents(
         batch_size: int = 1,
         embedding_model: str = "nomic-ai/nomic-embed-text-v1.5",
         api_base: str = "hf_spaces_local",
+        show_progress: bool = False,
 ) -> np.ndarray:
 
     if not texts:
@@ -92,7 +93,7 @@ def batch_embed_documents(
         texts = ['' if doc is None else doc for doc in texts]
 
     vecs: List[List[float]] = []
-    for i in tqdm(range(0, len(texts), batch_size)):
+    for i in tqdm(range(0, len(texts), batch_size), disable=not show_progress):
         chunk = texts[i:i + batch_size]
         try:
             resp = embedding_fn(

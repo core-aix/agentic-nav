@@ -106,7 +106,7 @@ class LLMAgent:
                     )
                 )
 
-        print(f"MESSAGES: {self.messages}")
+        LOGGER.debug(f"Interaction complete. Total messages: {len(self.messages)}")
         return self.messages
 
     def interact_stateless(

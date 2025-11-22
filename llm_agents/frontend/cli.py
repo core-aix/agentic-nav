@@ -36,7 +36,6 @@ from llm_agents.utils.file_handlers import save_chat_history
 from llm_agents.utils.cli import open_editor, show_history, print_help
 
 
-PROJECT_ROOT = Path(__file__).parent
 LOGGER = logging.getLogger(__name__)
 
 EMBEDDING_MODEL_NAME = os.environ.get("EMBEDDING_MODEL_NAME", "nomic-embed-text")
@@ -90,7 +89,19 @@ def render_markdown(text: str, title: Optional[str] = None):
 def stream_agent_response_sync(agent, message: dict):
     """
     Stream agent response with live markdown rendering.
-    Uses the agent's interact_stateless method for streaming.
+
+    This function:
+    1. Copies the agent's current history and appends the new message
+    2. Streams the response using interact_stateless generator
+    3. Updates the live display with markdown content and tool execution status
+    4. Updates the agent's history with the final message list
+
+    Note: KeyboardInterrupt is caught to allow graceful cancellation,
+    then re-raised so the caller can handle cleanup.
+
+    Args:
+        agent: The agent instance with interact_stateless support
+        message: User message dict with 'role', 'content', and optional '_ts'
     """
     # Get current history and add the new message
     messages = agent.get_history().copy()
@@ -148,11 +159,18 @@ def stream_agent_response_sync(agent, message: dict):
 
 
 async def async_interact(agent, message: dict):
-    """Async wrapper for agent interaction with streaming"""
+    """
+    Async wrapper for agent interaction with streaming.
+
+    Note: KeyboardInterrupt from stream_agent_response_sync is caught here
+    to prevent it from propagating up. The actual interrupt handling and
+    user feedback happens in stream_agent_response_sync.
+    """
     try:
         # Run the synchronous streaming function in a thread pool
         await asyncio.to_thread(stream_agent_response_sync, agent, message)
     except KeyboardInterrupt:
+        # Already handled in stream_agent_response_sync with user feedback
         LOGGER.info("Agent interaction cancelled by user")
     except Exception as e:
         LOGGER.error(f"Agent interaction failed: {e}")
@@ -222,9 +240,8 @@ def main(temperature, max_tokens, num_ctx, max_num_papers):
     }
     LOGGER.info(f"Global tool arguments: {tool_args}")
 
-    # Initialize agent
+    # Initialize agent (model is passed via llm_config/llm_args)
     agent = NeurIPS2025Agent(
-        # model=f"ollama_chat/{AGENT_MODEL_NAME}",
         api_base=AGENT_MODEL_API_BASE,
         api_key=OLLAMA_API_KEY,
         llm_args=llm_config,
