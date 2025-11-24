@@ -1,3 +1,20 @@
+---
+title: AgenticNav
+emoji: 📚
+colorFrom: blue
+colorTo: indigo
+sdk: gradio
+sdk_version: 5.50.0
+app_file: app.py
+python_version: 3.13
+pinned: true
+hf_oauth: true
+hf_oauth_scopes:
+  - inference-api
+license: apache-2.0
+short_description: Agent for NeurIPS paper discovery and visit schedule builder
+---
+
 # AgenticNAV - Your AI conference companion
 
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
