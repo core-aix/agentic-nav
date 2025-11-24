@@ -8,14 +8,14 @@ from pathlib import Path
 
 from typing import List, Dict, Any, Optional
 
-from llm_agents.tools.knowledge_graph.graph_traversal_strategies import (
+from agentic_nav.tools.knowledge_graph.graph_traversal_strategies import (
     TraversalStrategy,
     _graph_traversal_dfs_random,
     _graph_traversal_cypher,
     _graph_traversal_bfs_random
 )
 
-from llm_agents.utils.embedding_generator import batch_embed_documents
+from agentic_nav.utils.embedding_generator import batch_embed_documents
 
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
@@ -30,8 +30,18 @@ class Neo4jGraphWorker:
     """Search and traversal operations for Neo4j paper knowledge graph."""
 
     _DB_SIMILARITY_SEARCH_QUERY = """
+        MATCH (node:Paper)
+        WHERE ($day IS NULL OR node.session_start_time IS NOT NULL)
+        WITH node
+        WHERE ($day IS NULL OR date(datetime(node.session_start_time)).dayOfWeek = $day)
+        AND ($time_ranges IS NULL OR 
+             any(range IN $time_ranges WHERE 
+                 time(datetime(node.session_start_time)) >= time(range.start) 
+                 AND time(datetime(node.session_start_time)) <= time(range.end)))
+        WITH collect(node) as filtered_nodes
         CALL db.index.vector.queryNodes('paper_embeddings', $top_k, $query_embedding)
         YIELD node, score
+        WHERE node IN filtered_nodes OR ($day IS NULL AND $time_ranges IS NULL)
         RETURN node.id as id,
                node.name as name,
                node.abstract as abstract,
@@ -211,25 +221,26 @@ class Neo4jGraphWorker:
         return emb
 
     def similarity_search(
-        self,
-        user_query: str,
-        top_k: int = 5,
-        min_similarity: Optional[float] = None
+            self,
+            user_query: str,
+            day: Optional[str] = None,
+            timeslots: Optional[List[str]] = None,
+            top_k: int = 5,
+            min_similarity: Optional[float] = None
     ) -> List[Dict[str, Any]]:
         """
         Perform vector similarity search on paper embeddings.
 
         Args:
             user_query: User query (str)
+            day: Conference day as date string (e.g., "2024-12-10") or None
+            timeslots: List of time ranges as strings (e.g., ["09:00:00-12:00:00"]) or None
             top_k: Number of top results to return
             min_similarity: Optional minimum similarity threshold (0-1)
 
         Returns:
             List of dictionaries containing paper information and similarity scores
         """
-
-        # TODO: The DB query should optionally take the day and time, filter for the papers, and only then do similarity
-        #  search. We need randomness here, i.e., return all papers and shuffle them.
 
         # Generate text embedding
         query_embedding = self.embed_user_query(
@@ -240,12 +251,34 @@ class Neo4jGraphWorker:
         if isinstance(query_embedding, np.ndarray):
             query_embedding = query_embedding.tolist()
 
+        # Parse day and timeslots for the query
+        day_filter = None
+        time_ranges = []
+
+        if day:
+            # Convert date string to day of week (1=Monday, 7=Sunday)
+            from datetime import datetime
+            date_obj = datetime.strptime(day, "%Y-%m-%d")
+            day_filter = date_obj.isoweekday()
+
+        if timeslots:
+            # Parse timeslot ranges (e.g., "09:00:00-12:00:00")
+            for slot in timeslots:
+                if '-' in slot:
+                    start, end = slot.split('-')
+                    time_ranges.append({'start': start.strip(), 'end': end.strip()})
+                else:
+                    # If no range, assume it's a single time point with some buffer
+                    time_ranges.append({'start': slot.strip(), 'end': slot.strip()})
+
         with self.driver.session() as session:
             result = session.run(
                 self._DB_SIMILARITY_SEARCH_QUERY,
                 query_embedding=query_embedding,
                 top_k=top_k,
-                limit=NEO4J_DB_NODE_RETURN_LIMIT
+                limit=NEO4J_DB_NODE_RETURN_LIMIT,
+                day=day_filter,
+                time_ranges=time_ranges if time_ranges else None
             )
             papers = []
             for record in result:

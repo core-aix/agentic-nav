@@ -18,13 +18,12 @@ import datetime
 import logging
 import json
 
-from functools import partial
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict
 
-from llm_agents.agents import NeurIPS2025Agent, DEFAULT_NEURIPS2025_AGENT_ARGS
-from llm_agents.utils.logger import setup_logging
-from llm_agents.utils.file_handlers import save_chat_history
+from agentic_nav.agents import NeurIPS2025Agent, DEFAULT_NEURIPS2025_AGENT_ARGS
+from agentic_nav.utils.logger import setup_logging
+from agentic_nav.utils.file_handlers import save_chat_history
 
 
 LOGGER = logging.getLogger(__name__)
@@ -60,7 +59,7 @@ def configure_agent(
         max_num_papers: int,
         current_config: Dict
 ):
-    """Initialize the agent with given configuration."""
+    """Initialize the agent with a given configuration."""
     LOGGER.info(f"Agent runtime started via Gradio UI for session")
     current_config.update({
         "model": model,
@@ -296,17 +295,20 @@ def main():
     agent = initialize_agent()
 
     with gr.Blocks(
-        title="SciAgent For NeurIPS 2025",
+        title="AgenticNAV",
         theme=gr.themes.Default(
-            spacing_size=gr.themes.sizes.spacing_sm,
-            radius_size=gr.themes.sizes.radius_none
-        )
-    ) as webapp:
+        spacing_size=gr.themes.sizes.spacing_sm,
+        radius_size=gr.themes.sizes.radius_none
+    )) as webapp:
 
-        gr.Markdown("# 🤖 SciAgent For NeurIPS 2025")
-        gr.Markdown("Initialize the agent with your settings, then start chatting!")
-        gr.Markdown("*Each user session has its own independent conversation state. Enjoy!*")
-        gr.Markdown("Please note that this tool is experimental and the agent may not be able to return all papers that match your query.")
+        gr.Markdown(
+            "# 🤖 AgenticNAV - Explore NeurIPS 2025 papers and build your personalized schedule, effortlessly!\n "
+            "This agent can help you explore the more than 5000 papers at this year's NeurIPS conference. "
+            "You can start chatting right away but see below for more specific instructions on how to use the agent "
+            "with your favorite model and inference config. You can also set a custom system prompt.\n\n "
+            "**Note:** This is an experimental deployment and LLMs can make mistakes. This can mean that the agent may "
+            "not discover your paper even though it is presented at the conference."
+        )
 
         # Session state for agent instance, config, and messages
         config_state = gr.State(value=DEFAULT_NEURIPS2025_AGENT_ARGS)
@@ -317,7 +319,7 @@ def main():
                 # Main chat interface
                 chatbot = gr.Chatbot(
                     label="Conversation Trail",
-                    height=500,
+                    height=750,
                     type="messages",
                     show_copy_button=True,
                 )
@@ -510,15 +512,14 @@ def main():
         server_port=7860,  # Default Gradio port
         share=False,  # Set to True to create a public link
         show_error=True,
-        debug=True,
+        debug=True
     )
-
 
 if __name__ == "__main__":
     # Setup logging (only needs to be done once globally)
     setup_logging(
         log_dir="logs",
-        level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "INFO")
+        level=os.environ.get("AGENTIC_NAV_LOG_LEVEL", "INFO")
     )
 
     main()

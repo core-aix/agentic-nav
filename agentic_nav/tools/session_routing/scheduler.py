@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from collections import defaultdict
 import neo4j
 
-from llm_agents.tools.session_routing.utils import (
+from agentic_nav.tools.session_routing.utils import (
     convert_utc_to_local,
     format_time_slot,
     format_date_header,

@@ -10,9 +10,9 @@ import os
 from typing import Union, List, Optional
 from neo4j import GraphDatabase
 
-from llm_agents.tools.knowledge_graph import search_similar_papers
-from llm_agents.tools.session_routing.scheduler import ScheduleBuilder
-from llm_agents.tools.session_routing.utils import parse_date_input, parse_time_preference
+from agentic_nav.tools.knowledge_graph import search_similar_papers
+from agentic_nav.tools.session_routing.scheduler import ScheduleBuilder
+from agentic_nav.tools.session_routing.utils import parse_date_input, parse_time_preference
 
 
 # Environment variables for Neo4j connection

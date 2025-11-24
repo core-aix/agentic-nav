@@ -13,15 +13,15 @@ from tqdm import tqdm
 
 from pathlib import Path
 
-from llm_agents.utils.embedding_generator import batch_embed_documents
-from llm_agents.utils.logging import setup_logging
-from llm_agents.tools.knowledge_graph.file_handler import save_graph
+from agentic_nav.utils.embedding_generator import batch_embed_documents
+from agentic_nav.utils.logging import setup_logging
+from agentic_nav.tools.knowledge_graph.file_handler import save_graph
 
 
 # Setup logging
 setup_logging(
     log_dir="logs",
-    level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "INFO")
+    level=os.environ.get("AGENTIC_NAV_LOG_LEVEL", "INFO")
 )
 LOGGER = logging.getLogger(__name__)
 litellm._logging._disable_debugging()

@@ -6,8 +6,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import List, Dict
 
-from llm_agents.tools import get_all_tools
-from llm_agents.utils.tooling import infer_tool
+from agentic_nav.tools import get_all_tools
+from agentic_nav.utils.tooling import infer_tool
 
 try:
     from datetime import datetime, UTC

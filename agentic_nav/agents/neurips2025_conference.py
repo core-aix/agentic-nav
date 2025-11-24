@@ -1,8 +1,8 @@
 import os
 
 from dataclasses import dataclass
-from llm_agents.agents.base import LLMAgent
-from llm_agents.tools import search_similar_papers, find_neighboring_papers, traverse_graph, build_visit_schedule  # <- the tools we expose
+from agentic_nav.agents.base import LLMAgent
+from agentic_nav.tools import search_similar_papers, find_neighboring_papers, traverse_graph, build_visit_schedule  # <- the tools we expose
 from zoneinfo import ZoneInfo
 
 try:
@@ -29,10 +29,10 @@ system = {
         "However, note that the search tool only takes paper titles and abstracts as input keywords; "
         "it cannot take anything else as the input keywords. "
         "However, the output of the search includes various metadata fields such as authors, affiliations, "
-        "and session times. "
-        "\n"
+        "and session times. \n"
+        "When building a schedule, do not specify the name of the day.\n"
         f"Here is the current timestamp: {datetime.now(ZoneInfo('America/Los_Angeles'))}. The conference is happening in San Diego, California."
-    ) # TODO: Add timezone info.
+    )
 }
 
 
