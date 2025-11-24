@@ -18,13 +18,12 @@ import datetime
 import logging
 import json
 
-from functools import partial
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict
 
-from llm_agents.agents import NeurIPS2025Agent, DEFAULT_NEURIPS2025_AGENT_ARGS
-from llm_agents.utils.logging import setup_logging
-from llm_agents.utils.file_handlers import save_chat_history
+from agentic_nav.agents import NeurIPS2025Agent, DEFAULT_NEURIPS2025_AGENT_ARGS
+from agentic_nav.utils.logger import setup_logging
+from agentic_nav.utils.file_handlers import save_chat_history
 
 
 LOGGER = logging.getLogger(__name__)
@@ -32,7 +31,7 @@ LOGGER = logging.getLogger(__name__)
 EMBEDDING_MODEL_NAME = os.environ.get("EMBEDDING_MODEL_NAME", "nomic-embed-text")
 EMBEDDING_MODEL_API_BASE = os.environ.get("EMBEDDING_MODEL_API_BASE", "http://localhost:11435")
 
-AGENT_MODEL_NAME = os.environ.get("EMBEDDING_MODEL_NAME", "gpt-oss:20b")
+AGENT_MODEL_NAME = os.environ.get("AGENT_MODEL_NAME", "gpt-oss:20b")
 AGENT_MODEL_API_BASE = os.environ.get("AGENT_MODEL_API_BASE", "http://localhost:11436")
 OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY", DEFAULT_NEURIPS2025_AGENT_ARGS["api_key"])
 
@@ -60,7 +59,7 @@ def configure_agent(
         max_num_papers: int,
         current_config: Dict
 ):
-    """Initialize the agent with given configuration."""
+    """Initialize the agent with a given configuration."""
     LOGGER.info(f"Agent runtime started via Gradio UI for session")
     current_config.update({
         "model": model,
@@ -296,30 +295,79 @@ def main():
     agent = initialize_agent()
 
     with gr.Blocks(
-        title="SciAgent For NeurIPS 2025",
+        title="AgenticNAV",
         theme=gr.themes.Default(
-            spacing_size=gr.themes.sizes.spacing_sm,
-            radius_size=gr.themes.sizes.radius_none
-        )
-    ) as webapp:
+        spacing_size=gr.themes.sizes.spacing_sm,
+        radius_size=gr.themes.sizes.radius_none
+    )) as webapp:
 
-        gr.Markdown("# 🤖 SciAgent For NeurIPS 2025")
-        gr.Markdown("Initialize the agent with your settings, then start chatting!")
-        gr.Markdown("*Each user session has its own independent conversation state. Enjoy!*")
+        gr.Markdown(
+            "# 🤖 AgenticNAV - Explore NeurIPS 2025 papers and build your personalized schedule, effortlessly!\n "
+            "This agent can help you explore the more than 5000 papers at this year's NeurIPS conference. "
+            "You can start chatting right away but see below for more specific instructions on how to use the agent "
+            "with your favorite model and inference config. You can also set a custom system prompt.\n\n "
+            "**Note:** This is an experimental deployment and LLMs can make mistakes. This can mean that the agent may "
+            "not discover your paper even though it is presented at the conference."
+        )
 
         # Session state for agent instance, config, and messages
         config_state = gr.State(value=DEFAULT_NEURIPS2025_AGENT_ARGS)
         messages_state = gr.State(value=[agent.get_system_prompt()])
 
         with gr.Row():
-            with gr.Column(scale=1):
+            with gr.Column():
+                # Main chat interface
+                chatbot = gr.Chatbot(
+                    label="Conversation Trail",
+                    height=750,
+                    type="messages",
+                    show_copy_button=True,
+                )
+
+                with gr.Row():
+                    msg_input = gr.Textbox(
+                        label="Your message",
+                        placeholder="Type your message here...",
+                        lines=3,
+                        scale=4
+                    )
+                    submit_btn = gr.Button("Send", variant="primary", scale=1)
+
+                with gr.Row():
+                    clear_btn = gr.Button("🗑️ Clear Chat", size="sm")
+                    save_btn = gr.Button("💾 Save History", size="sm")
+
+                with gr.Row():
+                    # Help text at bottom
+                    gr.Markdown("""
+                        ### 📖 Usage Guide
+
+                        1. **Initialize**: Configure settings and click "Initialize Agent"
+                        2. **Chat**: Type messages and press Enter or click Send
+                        3. **System Prompt**: Customize the agent's behavior via System Prompt panel
+                        4. **History**: View or save your conversation using the History & Save panel
+                        5. **Clear**: Start a fresh conversation with the Clear Chat button
+
+                        ### Note on Ollama API Keys
+                        In case you are experiencing an error calling the agent model (usually indicated by a message 
+                        containing the word "unauthorized"), you may go to https://ollama.com and generate your own key. 
+                        You can provide it in the configuration below. It will not be stored on our system and gets deleted 
+                        when you end session (i.e., close your browser window).
+
+                        **Note**: Each browser session maintains its own independent conversation state.
+                        Uses stateless agent interaction for better concurrency support.
+                        """
+                    )
+
+        with gr.Row():
+            with gr.Column():
                 # Settings panel
                 gr.Markdown("### ⚙️ Agent Settings")
 
                 with gr.Accordion("Configuration", open=True):
                     api_base_input = gr.Textbox(
                         label="API Base URL",
-                        value="http://localhost:11434",
+                        value=AGENT_MODEL_API_BASE,
                         placeholder="http://localhost:11434"
                     )
 
@@ -332,7 +380,7 @@ def main():
 
                     model_input = gr.Textbox(
                         label="Model",
-                        value="ollama_chat/gpt-oss:20b",
+                        value=f"ollama_chat/{AGENT_MODEL_NAME}" if "ollama_chat" not in AGENT_MODEL_NAME else AGENT_MODEL_NAME,
                         placeholder="ollama_chat/gpt-oss:20b"
                     )
 
@@ -366,7 +414,7 @@ def main():
                         step=1
                     )
 
-                    init_btn = gr.Button("🚀 Initialize Agent", variant="primary")
+                    init_btn = gr.Button("Update Config", variant="primary")
                     init_status = gr.Textbox(label="Status", interactive=False)
 
                 with gr.Accordion("System Prompt", open=False):
@@ -393,46 +441,6 @@ def main():
                         value=""
                     )
                     save_status = gr.Textbox(label="Save Status", interactive=False)
-
-            with gr.Column(scale=3):
-                # Main chat interface
-                chatbot = gr.Chatbot(
-                    label="Conversation Trail",
-                    height=500,
-                    type="messages",
-                    show_copy_button=True,
-                )
-
-                with gr.Row():
-                    msg_input = gr.Textbox(
-                        label="Your message",
-                        placeholder="Type your message here...",
-                        lines=3,
-                        scale=4
-                    )
-                    submit_btn = gr.Button("Send", variant="primary", scale=1)
-
-                with gr.Row():
-                    clear_btn = gr.Button("🗑️ Clear Chat", size="sm")
-                    save_btn = gr.Button("💾 Save History", size="sm")
-
-                with gr.Row():
-                    # Help text at bottom
-                    gr.Markdown("""
-                        ### 📖 Usage Guide
-
-                        1. **Initialize**: Configure settings and click "Initialize Agent"
-                        2. **Chat**: Type messages and press Enter or click Send
-                        3. **System Prompt**: Customize the agent's behavior via System Prompt panel
-                        4. **History**: View or save your conversation using the History & Save panel
-                        5. **Clear**: Start a fresh conversation with the Clear Chat button
-
-                        All features from the terminal UI are available here!
-
-                        **Note**: Each browser session maintains its own independent conversation state.
-                        Uses stateless agent interaction for better concurrency support.
-                        """
-                    )
 
         # Event handlers
         init_btn.click(
@@ -504,15 +512,14 @@ def main():
         server_port=7860,  # Default Gradio port
         share=False,  # Set to True to create a public link
         show_error=True,
-        debug=True,
+        debug=True
     )
-
 
 if __name__ == "__main__":
     # Setup logging (only needs to be done once globally)
     setup_logging(
         log_dir="logs",
-        level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "INFO")
+        level=os.environ.get("AGENTIC_NAV_LOG_LEVEL", "INFO")
     )
 
     main()

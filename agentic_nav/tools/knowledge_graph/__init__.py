@@ -6,9 +6,9 @@ import os
 import random
 
 from toon_format import encode as toon_encode
-from typing import List, Optional
+from typing import List, Optional, Union
 
-from llm_agents.tools.knowledge_graph.retriever import Neo4jGraphWorker, LOGGER
+from agentic_nav.tools.knowledge_graph.retriever import Neo4jGraphWorker, LOGGER
 
 NEO4J_DB_URI = os.environ.get("NEO4J_DB_URI", "bolt://neo4j_db:7687")
 NEO4J_USERNAME = os.environ.get("NEO4J_USERNAME", "neo4j")
@@ -17,8 +17,10 @@ NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD")
 
 def search_similar_papers(
         user_query: str,
-        num_papers_to_return: int = 10,
-        min_similarity: float = None
+        num_papers_to_return: int = 50,
+        min_similarity: float = None,
+        day: str = None,
+        timeslots: List[str] = None
 ) -> str:
     """
     Search for research papers semantically similar to a user's natural language query.
@@ -32,10 +34,17 @@ def search_similar_papers(
         user_query (str): Natural language query describing the research topic or interest.
             The query is embedded and compared against paper embeddings in the database.
         num_papers_to_return (int, optional): Maximum number of papers to return, ranked by
-            similarity score. Defaults to 10.
+            similarity score. Defaults to 50.
         min_similarity (float, optional): Minimum similarity threshold for returned papers.
             Defaults to None (no filtering). Should be a value between 0.0 and 1.0, where
             higher values indicate stricter similarity requirements.
+        day (str, optional): Conference day as a date string in ISO format (e.g., "2024-12-10").
+            When provided, only papers scheduled on this day will be searched. Defaults to None
+            (no day filtering).
+        timeslots (List[str], optional): List of time ranges to filter papers by their session
+            times. Each timeslot should be formatted as "HH:MM:SS-HH:MM:SS" (e.g.,
+            ["09:00:00-12:00:00", "14:00:00-17:00:00"]). Papers with session start times
+            falling within any of these ranges will be included. Defaults to None (no time filtering).
 
     Returns:
         str: A token-efficient formatted string representation of papers matching the query,
@@ -53,12 +62,16 @@ def search_similar_papers(
     Notes:
         - This function is designed as the initial step in a multi-stage paper discovery workflow
         - Results can be further explored using find_neighboring_papers() or traverse_graph()
+        - When day and/or timeslots are provided, the database filters papers by their session
+          times BEFORE performing vector similarity search for better performance
         - TODO: The Neo4jGraphWorker should be wrapped in a session to better handle
           concurrent connections and connection pooling
 
     Raises:
         Connection errors if Neo4j database is not accessible
         ValueError if min_similarity is outside the valid range [0.0, 1.0]
+        ValueError if day is not in valid ISO date format (YYYY-MM-DD)
+        ValueError if timeslots are not properly formatted
         Embedding errors if the query cannot be properly embedded
 
     Example:
@@ -74,6 +87,22 @@ def search_similar_papers(
         ...     num_papers_to_return=20,
         ...     min_similarity=0.75
         ... )
+        >>>
+        >>> # Search for papers on a specific day and time
+        >>> morning_papers = search_similar_papers(
+        ...     user_query="computer vision applications",
+        ...     num_papers_to_return=50,
+        ...     day="2024-12-10",
+        ...     timeslots=["09:00:00-12:00:00"]
+        ... )
+        >>>
+        >>> # Search across multiple timeslots on a specific day
+        >>> daytime_papers = search_similar_papers(
+        ...     user_query="reinforcement learning",
+        ...     num_papers_to_return=25,
+        ...     day="2024-12-11",
+        ...     timeslots=["09:00:00-12:00:00", "14:00:00-17:00:00"]
+        ... )
     """
     # Type coercion for parameters that may come as strings from LLM tool calls
     if num_papers_to_return is not None and not isinstance(num_papers_to_return, int):
@@ -81,17 +110,24 @@ def search_similar_papers(
     if min_similarity is not None and not isinstance(min_similarity, float):
         min_similarity = float(min_similarity)
 
+    # Handle timeslots - ensure it's a list or None
+    if timeslots is not None and isinstance(timeslots, str):
+        # If a single string is provided, wrap it in a list
+        timeslots = [timeslots]
+
     worker = Neo4jGraphWorker(
         uri=NEO4J_DB_URI,
         username=NEO4J_USERNAME,
         password=NEO4J_PASSWORD
     )
 
-    # Fetch papers
+    # Fetch papers with optional day and time filtering
     papers = worker.similarity_search(
         user_query=user_query,
         top_k=num_papers_to_return,
-        min_similarity=min_similarity
+        min_similarity=min_similarity,
+        day=day,
+        timeslots=timeslots
     )
 
     # Format outputs to be more token efficient
@@ -102,9 +138,9 @@ def search_similar_papers(
 
 def find_neighboring_papers(
         paper_id: str,
-        relationship_types: List[str] = ["SIMILAR_TO"],
-        neighbor_entity: str = "similar_papers",
-        num_neighbors_to_return: int = 10
+        relationship_types: Union[List[str], str] = ["SIMILAR_TO"],
+        num_neighbors_to_return: int = 10,
+        min_similarity: float = 0.75
 ) -> str:
     """
     Retrieve immediate neighboring entities of a specific paper from the Neo4j knowledge graph.
@@ -115,14 +151,15 @@ def find_neighboring_papers(
 
     Args:
         paper_id (str): The unique identifier of the target paper node in the graph. neo4j UUID.
-        relationship_types (List[str], optional): Types of relationships to query.
+        relationship_types (List[str], str): Types of relationships to query.
             Defaults to ["SIMILAR_TO"].
-            Valid options: ["SIMILAR_TO", "AUTHORED_BY", "BELONGS_TO_TOPIC"]
+            Valid options: ["SIMILAR_TO", "IS_AUTHOR_OF", "BELONGS_TO_TOPIC"]
         neighbor_entity (str, optional): The type of neighboring entity to return.
             Defaults to "similar_papers".
             Valid options: ["similar_papers", "authors", "topics", "raw_results"]
         num_neighbors_to_return (int, optional): Maximum number of neighbors to return.
             Defaults to 10. Results are randomly shuffled before truncation to provide diversity.
+        min_similarity (float, optional): Minimum similarity threshold for returned neighbors.
 
     Returns:
         str: A token-efficient formatted string representation of neighboring entities,
@@ -137,7 +174,7 @@ def find_neighboring_papers(
         - Only the three specified relationship types are supported
         - Only the four specified neighbor entity types are supported
         - The neighbor_entity parameter must match the relationship_types used
-          (e.g., "similar_papers" with "SIMILAR_TO", "authors" with "AUTHORED_BY")
+          (e.g., "similar_papers" with "SIMILAR_TO", "authors" with "IS_AUTHOR_OF")
 
     Notes:
         - Results are randomly shuffled to provide diverse recommendations across multiple calls
@@ -160,7 +197,7 @@ def find_neighboring_papers(
         >>>
         >>> authors = find_neighboring_papers(
         ...     paper_id="<UUID>",
-        ...     relationship_types=["AUTHORED_BY"],
+        ...     relationship_types=["IS_AUTHOR_OF"],
         ...     neighbor_entity="authors",
         ...     num_neighbors_to_return=3
         ... )
@@ -181,13 +218,13 @@ def find_neighboring_papers(
     neighbors = worker.neighborhood_search(
         paper_id=paper_id,
         relationship_types=relationship_types,
+        min_similarity=min_similarity,
     )
 
     relevant_neighbors = []
-    for neighbor in neighbors[neighbor_entity]:
-        relevant_neighbors.append({
-            **neighbor["neighbor"]
-        })
+    for rel_type, neighbor in neighbors.items():
+        if rel_type != relationship_types:
+            relevant_neighbors.append(neighbor)
 
     # Constrain and shuffle neighbors for more diverse responses
     random.shuffle(relevant_neighbors)

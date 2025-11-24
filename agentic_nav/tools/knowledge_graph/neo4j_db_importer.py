@@ -13,14 +13,14 @@ import numpy as np
 from tqdm import tqdm
 from pathlib import Path
 
-from llm_agents.tools.knowledge_graph.file_handler import load_graph
-from llm_agents.utils.logging import setup_logging
+from agentic_nav.tools.knowledge_graph.file_handler import load_graph
+from agentic_nav.utils.logger import setup_logging
 
 
 # Setup logging
 setup_logging(
     log_dir="logs",
-    level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "INFO")
+    level=os.environ.get("AGENTIC_NAV_LOG_LEVEL", "INFO")
 )
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
@@ -47,11 +47,25 @@ class Neo4jImporter:
         """Close the Neo4j driver connection."""
         self.driver.close()
 
-    def clear_database(self):
-        """Clear all nodes and relationships from the database."""
+    def clear_database(self, batch_size=500):
         with self.driver.session() as session:
-            session.run("MATCH (n) DETACH DELETE n")
-            LOGGER.info("Cleared existing database")
+            deleted_total = 0
+            while True:
+                result = session.run("""
+                    MATCH (n)
+                    WITH n LIMIT $batch_size
+                    DETACH DELETE n
+                    RETURN count(n) as deleted
+                    """,
+                    batch_size=batch_size
+                )
+
+                deleted = result.single()["deleted"]
+                deleted_total += deleted
+                LOGGER.info(f"Deleted {deleted} nodes (total: {deleted_total})")
+
+                if deleted == 0:
+                    break
 
     def create_indexes(self, embedding_dimension: int = 768):
         """Create indexes for better query performance, including vector index."""
@@ -107,19 +121,22 @@ class Neo4jImporter:
                         embedding = embedding.tolist()
 
                     paper_dict = {
-                        'id': node_id,
-                        'name': data.get('name', ''),
-                        'abstract': data.get('abstract', ''),
-                        'topic': data.get('topic', ''),
-                        'keywords': data.get('keywords', []),
-                        'decision': data.get('decision', ''),
-                        'session': data.get('session', ''),
-                        'session_start_time': data.get('session_start_time', ''),
-                        'session_end_time': data.get('session_end_time', ''),
-                        'presentation_type': data.get('presentation_type', ''),
-                        'room_name': data.get('room_name', ''),
-                        'project_url': data.get('project_url', ''),
-                        'poster_position': data.get('poster_position', ''),
+                        "id": node_id,
+                        "name": data.get('name', ''),
+                        "abstract": data.get('abstract', ''),
+                        "topic": data.get('topic', ''),
+                        "keywords": data.get('keywords', []),
+                        "decision": data.get('decision', ''),
+                        "session": data.get('session', ''),
+                        "session_start_time": data.get('session_start_time', ''),
+                        "session_end_time": data.get('session_end_time', ''),
+                        "presentation_type": data.get('presentation_type', ''),
+                        "room_name": data.get('room_name', ''),
+                        "project_url": data.get('project_url', ''),
+                        "poster_position": data.get('poster_position', ''),
+                        "paper_url": data.get("paper_url", ""),
+                        "sourceid": data.get("sourceid", ""),
+                        "virtualsite_url": data.get("virtualsite_url", ""),
                         'embedding': embedding
                     }
                     papers_data.append(paper_dict)
@@ -141,6 +158,9 @@ class Neo4jImporter:
                         room_name: paper.room_name,
                         project_url: paper.project_url,
                         poster_position: paper.poster_position,
+                        paper_url: paper.paper_url,
+                        sourceid: paper.sourceid,
+                        virtualsite_url: paper.virtualsite_url,
                         embedding: paper.embedding
                     })
                 """, papers=papers_data)
@@ -399,8 +419,8 @@ class Neo4jImporter:
 
             LOGGER.info(f"Created {len(author_paper_edges)} author-paper relationships")
 
-    def export_graph(self, kg_path: str, batch_size: int = 100, embedding_dimension: int = 768):
-        """Export the entire knowledge graph to Neo4j."""
+    def import_graph(self, kg_path: str, batch_size: int = 100, embedding_dimension: int = 768):
+        """Import the entire knowledge graph to Neo4j."""
         LOGGER.info(f"Loading graph from path {kg_path}")
         kg = load_graph(kg_path)
 
@@ -503,7 +523,7 @@ def main(
     """
     importer = Neo4jImporter(neo4j_uri, neo4j_username, neo4j_password)
     try:
-        importer.export_graph(
+        importer.import_graph(
             graph_path,
             batch_size,
             embedding_dimension

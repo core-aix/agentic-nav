@@ -28,7 +28,7 @@ def setup_test_environment(request):
         "AGENT_MODEL_NAME": "gpt-oss:20b",
         "AGENT_MODEL_API_BASE": "http://localhost:11436",
         "OLLAMA_API_KEY": "test-api-key",
-        "LLM_AGENTS_LOG_LEVEL": "DEBUG",
+        "AGENTIC_NAV_LOG_LEVEL": "DEBUG",
         "POPULATE_DATABASE_NIPS2025": "false"
     }
     

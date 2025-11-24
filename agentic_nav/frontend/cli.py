@@ -12,8 +12,8 @@ Features:
 import asyncio
 import click
 import os
-import datetime
 import logging
+import litellm
 from pathlib import Path
 from typing import Optional
 
@@ -29,13 +29,18 @@ from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.formatted_text import HTML
 
-from llm_agents.agents import NeurIPS2025Agent
-from llm_agents.utils.logging import setup_logging
-from llm_agents.utils.file_handlers import save_chat_history
-from llm_agents.utils.cli import open_editor, show_history, print_help
+from agentic_nav.agents import NeurIPS2025Agent
+from agentic_nav.utils.logger import setup_logging
+from agentic_nav.utils.file_handlers import save_chat_history
+from agentic_nav.utils.cli import open_editor, show_history, print_help
+
+try:
+    from datetime import datetime, UTC
+except ImportError:
+    from datetime import datetime, timezone
+    UTC = timezone.utc
 
 
-PROJECT_ROOT = Path(__file__).parent
 LOGGER = logging.getLogger(__name__)
 
 EMBEDDING_MODEL_NAME = os.environ.get("EMBEDDING_MODEL_NAME", "nomic-embed-text")
@@ -45,6 +50,7 @@ AGENT_MODEL_NAME = os.environ.get("AGENT_MODEL_NAME", "gpt-oss:20b")
 AGENT_MODEL_API_BASE = os.environ.get("AGENT_MODEL_API_BASE", "http://localhost:11436")
 OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY")
 
+litellm._logging._disable_debugging()
 console = Console(soft_wrap=True)
 
 # Command completer for auto-complete
@@ -88,7 +94,19 @@ def render_markdown(text: str, title: Optional[str] = None):
 def stream_agent_response_sync(agent, message: dict):
     """
     Stream agent response with live markdown rendering.
-    Uses the agent's interact_stateless method for streaming.
+
+    This function:
+    1. Copies the agent's current history and appends the new message
+    2. Streams the response using interact_stateless generator
+    3. Updates the live display with markdown content and tool execution status
+    4. Updates the agent's history with the final message list
+
+    Note: KeyboardInterrupt is caught to allow graceful cancellation,
+    then re-raised so the caller can handle cleanup.
+
+    Args:
+        agent: The agent instance with interact_stateless support
+        message: User message dict with 'role', 'content', and optional '_ts'
     """
     # Get current history and add the new message
     messages = agent.get_history().copy()
@@ -146,11 +164,18 @@ def stream_agent_response_sync(agent, message: dict):
 
 
 async def async_interact(agent, message: dict):
-    """Async wrapper for agent interaction with streaming"""
+    """
+    Async wrapper for agent interaction with streaming.
+
+    Note: KeyboardInterrupt from stream_agent_response_sync is caught here
+    to prevent it from propagating up. The actual interrupt handling and
+    user feedback happens in stream_agent_response_sync.
+    """
     try:
         # Run the synchronous streaming function in a thread pool
         await asyncio.to_thread(stream_agent_response_sync, agent, message)
     except KeyboardInterrupt:
+        # Already handled in stream_agent_response_sync with user feedback
         LOGGER.info("Agent interaction cancelled by user")
     except Exception as e:
         LOGGER.error(f"Agent interaction failed: {e}")
@@ -198,7 +223,7 @@ def main(temperature, max_tokens, num_ctx, max_num_papers):
     # Setup logging
     setup_logging(
         log_dir="logs",
-        level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "INFO")
+        level=os.environ.get("AGENTIC_NAV_LOG_LEVEL", "INFO")
     )
 
     print_welcome()
@@ -206,6 +231,8 @@ def main(temperature, max_tokens, num_ctx, max_num_papers):
 
     # Config for the LLM messages
     llm_config = {
+        "model": f"ollama_chat/{AGENT_MODEL_NAME}",
+        "api_base": AGENT_MODEL_API_BASE,
         "temperature": temperature,
         "max_tokens": max_tokens,
         "num_ctx": num_ctx
@@ -218,9 +245,8 @@ def main(temperature, max_tokens, num_ctx, max_num_papers):
     }
     LOGGER.info(f"Global tool arguments: {tool_args}")
 
-    # Initialize agent
+    # Initialize agent (model is passed via llm_config/llm_args)
     agent = NeurIPS2025Agent(
-        model=f"ollama_chat/{AGENT_MODEL_NAME}",
         api_base=AGENT_MODEL_API_BASE,
         api_key=OLLAMA_API_KEY,
         llm_args=llm_config,
@@ -278,7 +304,7 @@ def main(temperature, max_tokens, num_ctx, max_num_papers):
                     next_message = {
                         "role": "user",
                         "content": content,
-                        "_ts": str(datetime.datetime.now(datetime.UTC))
+                        "_ts": str(datetime.now(UTC))
                     }
                 else:
                     console.print("[yellow]⚠ No content provided[/yellow]")
@@ -304,7 +330,7 @@ def main(temperature, max_tokens, num_ctx, max_num_papers):
 
             elif cmd == "/save":
                 Path("chat_histories/").mkdir(exist_ok=True, parents=True)
-                time_now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+                time_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
                 path = arg.strip() or f"chat_histories/{time_now}_chat_history.json"
 
                 try:
@@ -324,7 +350,7 @@ def main(temperature, max_tokens, num_ctx, max_num_papers):
             next_message = {
                 "role": "user",
                 "content": line,
-                "_ts": str(datetime.datetime.now(datetime.UTC))
+                "_ts": str(datetime.now(UTC))
             }
 
         try:

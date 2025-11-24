@@ -23,10 +23,10 @@ bash scripts/prepare_gradio.sh
 ### Running the Application
 ```bash
 # CLI interface
-uv run llm-agents-cli -t 0.4 --max-tokens 6000 -c 131072 --max-num-papers 10
+uv run agentic-nav-cli -t 0.4 --max-tokens 6000 -c 131072 --max-num-papers 10
 
 # Web interface
-llm-agents-web
+agentic-nav-web
 ```
 
 ### Database and Knowledge Graph
@@ -140,7 +140,7 @@ AGENT_MODEL_NAME=gpt-oss:20b
 AGENT_MODEL_API_BASE=http://localhost:11436
 OLLAMA_API_KEY=<optional>
 POPULATE_DATABASE_NIPS2025=false
-LLM_AGENTS_LOG_LEVEL=INFO
+AGENTIC_NAV_LOG_LEVEL=INFO
 ```
 
 ### Model Support
