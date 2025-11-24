@@ -1,7 +1,7 @@
 # AgenticNAV - Your AI conference companion
 
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
-![Coverage](https://github.com/shiqiangw/llm-agents/workflows/Tests/badge.svg)
+![Coverage](https://github.com/core-aix/agentic-nav/workflows/Tests/badge.svg)
 
 This repository contains code for an agent that can help you do related work for your next research project. 
 Given the sheer amount of new publications that are being published at major machine learning conferences, this agent
@@ -47,8 +47,8 @@ echo "OLLAMA_API_KEY=<your key here>" >> .env
 # Warning (!): Setting the parameter below to 'true' will clear any existing data inside the docker-based neo4j database
 echo "POPULATE_DATABASE_NIPS2025=false" >> .env
 
-git clone https://github.com/shiqiangw/llm-agents.git
-cd llm-agents 
+git clone https://github.com/core-aix/agentic-nav.git
+cd agentic-nav 
 docker compose up --build -d
 ```
 
@@ -99,8 +99,8 @@ export $(grep -v '^#' .env | xargs)
 
 Then get the project files:
 ```commandline
-git clone https://github.com/shiqiangw/llm-agents.git
-cd llm-agents
+git clone https://github.com/core-aix/agentic-nav.git
+cd agentic-nav
 docker compose up neo4j_db ollama_embed ollama_agent -d
 
 # The following command is only needed if you'd like to use the gradio-based GUI
@@ -162,7 +162,7 @@ Below are two examples how to run a local and a remote model.
 We are using LiteLLM to abstract away from individual inference API providers.
 Note, that we currently only test with Ollama models.
 ```commandline
-uv run llm-agents-cli \
+uv run agentic-nav-cli \
     -t 0.4 \
     --max-tokens 6000 \
     -c 131072 \
@@ -173,7 +173,7 @@ uv run llm-agents-cli \
 We use gradio to provide a chat interface with the same functionalities as the commandline-based interface. 
 You can launch the web app by running: 
 ```commandline
-llm-agents-web
+agentic-nav-web
 ```
 All the hyperparameters you need to set can be configured in the web interface and will be used in you individual session.
 Once you close the browser window, your session will terminate and all custom configuration will be removed.
@@ -181,7 +181,7 @@ At the moment, the web UI only supports Ollama models.
 
 ### Debugging agent interactions
 The agent involves a set of asynchronous operations. We provide a built-in logging instance to capture all relevant logs 
-for debugging. To set the right debugging level for your application, you can use the environment variable `LLM_AGENTS_LOG_LEVEL`. 
+for debugging. To set the right debugging level for your application, you can use the environment variable `AGENTIC_NAV_LOG_LEVEL`. 
 By default, it is set to `INFO`.
 
 #### Running tests

@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from collections import defaultdict
 import neo4j
 
-from llm_agents.tools.session_routing.utils import (
+from agentic_nav.tools.session_routing.utils import (
     convert_utc_to_local,
     format_time_slot,
     format_date_header,
@@ -349,7 +349,7 @@ class ScheduleBuilder:
                     authors_str = 'N/A'
 
                 # Format paper entry
-                output.append(f"- **{pres_type} {poster_pos.replace('#', '') if poster_pos is not None else ""}** | {title}")
+                output.append(f"- **{pres_type} {poster_pos.replace('#', '') if poster_pos is not None else ''}** | {title}")
                 output.append(f"  - Authors: {authors_str}")
                 output.append(f"  - Topic: {topic}")
 

@@ -13,14 +13,14 @@ import numpy as np
 from tqdm import tqdm
 from pathlib import Path
 
-from llm_agents.tools.knowledge_graph.file_handler import load_graph
-from llm_agents.utils.logging import setup_logging
+from agentic_nav.tools.knowledge_graph.file_handler import load_graph
+from agentic_nav.utils.logger import setup_logging
 
 
 # Setup logging
 setup_logging(
     log_dir="logs",
-    level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "INFO")
+    level=os.environ.get("AGENTIC_NAV_LOG_LEVEL", "INFO")
 )
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent

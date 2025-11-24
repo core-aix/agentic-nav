@@ -12,7 +12,6 @@ Features:
 import asyncio
 import click
 import os
-import datetime
 import logging
 import litellm
 from pathlib import Path
@@ -30,10 +29,16 @@ from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.formatted_text import HTML
 
-from llm_agents.agents import NeurIPS2025Agent
-from llm_agents.utils.logger import setup_logging
-from llm_agents.utils.file_handlers import save_chat_history
-from llm_agents.utils.cli import open_editor, show_history, print_help
+from agentic_nav.agents import NeurIPS2025Agent
+from agentic_nav.utils.logger import setup_logging
+from agentic_nav.utils.file_handlers import save_chat_history
+from agentic_nav.utils.cli import open_editor, show_history, print_help
+
+try:
+    from datetime import datetime, UTC
+except ImportError:
+    from datetime import datetime, timezone
+    UTC = timezone.utc
 
 
 LOGGER = logging.getLogger(__name__)
@@ -218,7 +223,7 @@ def main(temperature, max_tokens, num_ctx, max_num_papers):
     # Setup logging
     setup_logging(
         log_dir="logs",
-        level=os.environ.get("LLM_AGENTS_LOG_LEVEL", "INFO")
+        level=os.environ.get("AGENTIC_NAV_LOG_LEVEL", "INFO")
     )
 
     print_welcome()
@@ -299,7 +304,7 @@ def main(temperature, max_tokens, num_ctx, max_num_papers):
                     next_message = {
                         "role": "user",
                         "content": content,
-                        "_ts": str(datetime.datetime.now(datetime.UTC))
+                        "_ts": str(datetime.now(UTC))
                     }
                 else:
                     console.print("[yellow]⚠ No content provided[/yellow]")
@@ -325,7 +330,7 @@ def main(temperature, max_tokens, num_ctx, max_num_papers):
 
             elif cmd == "/save":
                 Path("chat_histories/").mkdir(exist_ok=True, parents=True)
-                time_now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+                time_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
                 path = arg.strip() or f"chat_histories/{time_now}_chat_history.json"
 
                 try:
@@ -345,7 +350,7 @@ def main(temperature, max_tokens, num_ctx, max_num_papers):
             next_message = {
                 "role": "user",
                 "content": line,
-                "_ts": str(datetime.datetime.now(datetime.UTC))
+                "_ts": str(datetime.now(UTC))
             }
 
         try:

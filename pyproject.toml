@@ -1,45 +1,43 @@
 [project]
-name = "llm-agents"
+name = "agentic-nav"
 version = "0.1.0"
-description = "A package containing versatile tooling for doing related work analysis and planning conference visits in the AI research space."
+description = "Conference navigation agent leveraging graph databases and semantic search to provide paper recommendations, research network exploration, and automated schedule generation for NeurIPS 2025 attendees."
 readme = "README.md"
 authors = [
     {name = "Shiqiang Wang", email = "s.wang9@exeter.ac.uk"},
     {name = "Herbert Woisetschläger", email = "herbert.woisetschlaeger@tum.de"}
 ]
 
-requires-python = ">=3.14"
+requires-python = ">=3.10"
 dependencies = [
-    "aiofiles>=22.0,<25.0",
-    "einops>=0.8.1",
-    "flask>=3.1.2",
-    "gradio",
-    "hatchling>=1.27.0",
-    "httpx>=0.28.1",
-    "kaleido>=1.1.0",
+    "aiofiles",
+    "einops",
+    "flask",
+    "gradio[mcp,oauth]",
+    "hatchling",
+    "httpx",
+    "kaleido",
     "litellm",
-    "neo4j>=6.0.3",
-    "prompt-toolkit>=3.0.0",
-    "pydantic>=2.12.3",
-    "pydantic-settings>=2.11.0",
+    "neo4j",
+    "prompt-toolkit",
+    "pydantic",
+    "pydantic-settings",
     "pyvis>=0.3.2",
     "rich>=13.0.0",
-    "sentence-transformers>=5.1.2",
-    "spaces>=0.42.1",
+    "sentence-transformers",
     "toon-format",
-    "typer>=0.20.0",
+    "torch==2.8.0",
+    "typer",
 ]
 
 [tool.uv.workspace]
 members = [
     "litellm",
-    "gradio",
 ]
 
 [tool.uv.sources]
 litellm = { git = "https://github.com/shiqiangw/litellm.git" }
 toon-format = { git = "https://github.com/toon-format/toon-python.git" }
-gradio = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
@@ -57,5 +55,5 @@ dev = [
 packages = ["llm_agents"]
 
 [project.scripts]
-agentic-nav-cli = "llm_agents.frontend.cli:main"
-agentic-nav-web = "llm_agents.frontend.browser_ui:main"
+agentic-nav-cli = "agentic_nav.frontend.cli:main"
+agentic-nav-web = "agentic_nav.frontend.browser_ui:main"

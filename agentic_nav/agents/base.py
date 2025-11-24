@@ -3,13 +3,17 @@ import json
 import litellm
 import logging
 
-from datetime import datetime, UTC
 from dataclasses import dataclass, field
 from typing import List, Dict
 
-from llm_agents.tools import get_all_tools
-from llm_agents.utils.tooling import infer_tool
+from agentic_nav.tools import get_all_tools
+from agentic_nav.utils.tooling import infer_tool
 
+try:
+    from datetime import datetime, UTC
+except ImportError:
+    from datetime import datetime, timezone
+    UTC = timezone.utc
 
 LOGGER = logging.getLogger(__name__)
 
