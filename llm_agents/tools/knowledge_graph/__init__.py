@@ -17,7 +17,7 @@ NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD")
 
 def search_similar_papers(
         user_query: str,
-        num_papers_to_return: int = 10,
+        num_papers_to_return: int = 50,
         min_similarity: float = None
 ) -> str:
     """
@@ -32,7 +32,7 @@ def search_similar_papers(
         user_query (str): Natural language query describing the research topic or interest.
             The query is embedded and compared against paper embeddings in the database.
         num_papers_to_return (int, optional): Maximum number of papers to return, ranked by
-            similarity score. Defaults to 10.
+            similarity score. Defaults to 50.
         min_similarity (float, optional): Minimum similarity threshold for returned papers.
             Defaults to None (no filtering). Should be a value between 0.0 and 1.0, where
             higher values indicate stricter similarity requirements.

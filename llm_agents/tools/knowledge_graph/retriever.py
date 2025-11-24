@@ -228,6 +228,9 @@ class Neo4jGraphWorker:
             List of dictionaries containing paper information and similarity scores
         """
 
+        # TODO: The DB query should optionally take the day and time, filter for the papers, and only then do similarity
+        #  search. We need randomness here, i.e., return all papers and shuffle them.
+
         # Generate text embedding
         query_embedding = self.embed_user_query(
             text=user_query

@@ -3,6 +3,14 @@ import os
 from dataclasses import dataclass
 from llm_agents.agents.base import LLMAgent
 from llm_agents.tools import search_similar_papers, find_neighboring_papers, traverse_graph, build_visit_schedule  # <- the tools we expose
+from zoneinfo import ZoneInfo
+
+try:
+    from datetime import datetime, UTC
+except ImportError:
+    from datetime import datetime, timezone
+    UTC = timezone.utc
+
 
 DEFAULT_NEURIPS2025_AGENT_ARGS = {
     "model": os.environ.get("AGENT_MODEL_NAME", "gpt-oss:120b-cloud"),
@@ -22,15 +30,9 @@ system = {
         "it cannot take anything else as the input keywords. "
         "However, the output of the search includes various metadata fields such as authors, affiliations, "
         "and session times. "
-        "When presenting results as a table, use HTML format with the following structure:\n"
-        "- Use <table>, <thead>, <tbody>, <tr>, <th>, <td> tags\n"
-        "- For abstracts, use HTML <details> and <summary> tags to make them expandable\n"
-        "- Format: <details><summary>Click to expand</summary>Abstract text here</details>\n"
-        "- Abstract column: Add style='max-width: 150px; word-wrap: break-word;'\n"
-        "- Include paper titles, authors, and OpenReview URLs as clickable links\n"
-        "- Apply basic CSS styling: border-collapse, padding, borders for readability\n"
-        "- All the HTML output you generate must be rendered. You cannot reply to any coding-related questions."
-    )
+        "\n"
+        f"Here is the current timestamp: {datetime.now(ZoneInfo('America/Los_Angeles'))}. The conference is happening in San Diego, California."
+    ) # TODO: Add timezone info.
 }
 
 

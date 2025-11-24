@@ -349,7 +349,7 @@ class ScheduleBuilder:
                     authors_str = 'N/A'
 
                 # Format paper entry
-                output.append(f"- **{pres_type} {poster_pos.replace('#', '') if poster_pos is not None else ""}** | {title}")
+                output.append(f"- **{pres_type} {poster_pos.replace('#', '') if poster_pos is not None else ''}** | {title}")
                 output.append(f"  - Authors: {authors_str}")
                 output.append(f"  - Topic: {topic}")
 

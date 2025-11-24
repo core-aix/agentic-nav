@@ -306,20 +306,66 @@ def main():
         gr.Markdown("# 🤖 SciAgent For NeurIPS 2025")
         gr.Markdown("Initialize the agent with your settings, then start chatting!")
         gr.Markdown("*Each user session has its own independent conversation state. Enjoy!*")
+        gr.Markdown("Please note that this tool is experimental and the agent may not be able to return all papers that match your query.")
 
         # Session state for agent instance, config, and messages
         config_state = gr.State(value=DEFAULT_NEURIPS2025_AGENT_ARGS)
         messages_state = gr.State(value=[agent.get_system_prompt()])
 
         with gr.Row():
-            with gr.Column(scale=1):
+            with gr.Column():
+                # Main chat interface
+                chatbot = gr.Chatbot(
+                    label="Conversation Trail",
+                    height=500,
+                    type="messages",
+                    show_copy_button=True,
+                )
+
+                with gr.Row():
+                    msg_input = gr.Textbox(
+                        label="Your message",
+                        placeholder="Type your message here...",
+                        lines=3,
+                        scale=4
+                    )
+                    submit_btn = gr.Button("Send", variant="primary", scale=1)
+
+                with gr.Row():
+                    clear_btn = gr.Button("🗑️ Clear Chat", size="sm")
+                    save_btn = gr.Button("💾 Save History", size="sm")
+
+                with gr.Row():
+                    # Help text at bottom
+                    gr.Markdown("""
+                        ### 📖 Usage Guide
+
+                        1. **Initialize**: Configure settings and click "Initialize Agent"
+                        2. **Chat**: Type messages and press Enter or click Send
+                        3. **System Prompt**: Customize the agent's behavior via System Prompt panel
+                        4. **History**: View or save your conversation using the History & Save panel
+                        5. **Clear**: Start a fresh conversation with the Clear Chat button
+
+                        ### Note on Ollama API Keys
+                        In case you are experiencing an error calling the agent model (usually indicated by a message 
+                        containing the word "unauthorized"), you may go to https://ollama.com and generate your own key. 
+                        You can provide it in the configuration below. It will not be stored on our system and gets deleted 
+                        when you end session (i.e., close your browser window).
+
+                        **Note**: Each browser session maintains its own independent conversation state.
+                        Uses stateless agent interaction for better concurrency support.
+                        """
+                    )
+
+        with gr.Row():
+            with gr.Column():
                 # Settings panel
                 gr.Markdown("### ⚙️ Agent Settings")
 
                 with gr.Accordion("Configuration", open=True):
                     api_base_input = gr.Textbox(
                         label="API Base URL",
-                        value="http://localhost:11434",
+                        value=AGENT_MODEL_API_BASE,
                         placeholder="http://localhost:11434"
                     )
 
@@ -332,7 +378,7 @@ def main():
 
                     model_input = gr.Textbox(
                         label="Model",
-                        value="ollama_chat/gpt-oss:20b",
+                        value=f"ollama_chat/{AGENT_MODEL_NAME}" if "ollama_chat" not in AGENT_MODEL_NAME else AGENT_MODEL_NAME,
                         placeholder="ollama_chat/gpt-oss:20b"
                     )
 
@@ -366,7 +412,7 @@ def main():
                         step=1
                     )
 
-                    init_btn = gr.Button("🚀 Initialize Agent", variant="primary")
+                    init_btn = gr.Button("Update Config", variant="primary")
                     init_status = gr.Textbox(label="Status", interactive=False)
 
                 with gr.Accordion("System Prompt", open=False):
@@ -393,46 +439,6 @@ def main():
                         value=""
                     )
                     save_status = gr.Textbox(label="Save Status", interactive=False)
-
-            with gr.Column(scale=3):
-                # Main chat interface
-                chatbot = gr.Chatbot(
-                    label="Conversation Trail",
-                    height=500,
-                    type="messages",
-                    show_copy_button=True,
-                )
-
-                with gr.Row():
-                    msg_input = gr.Textbox(
-                        label="Your message",
-                        placeholder="Type your message here...",
-                        lines=3,
-                        scale=4
-                    )
-                    submit_btn = gr.Button("Send", variant="primary", scale=1)
-
-                with gr.Row():
-                    clear_btn = gr.Button("🗑️ Clear Chat", size="sm")
-                    save_btn = gr.Button("💾 Save History", size="sm")
-
-                with gr.Row():
-                    # Help text at bottom
-                    gr.Markdown("""
-                        ### 📖 Usage Guide
-
-                        1. **Initialize**: Configure settings and click "Initialize Agent"
-                        2. **Chat**: Type messages and press Enter or click Send
-                        3. **System Prompt**: Customize the agent's behavior via System Prompt panel
-                        4. **History**: View or save your conversation using the History & Save panel
-                        5. **Clear**: Start a fresh conversation with the Clear Chat button
-
-                        All features from the terminal UI are available here!
-
-                        **Note**: Each browser session maintains its own independent conversation state.
-                        Uses stateless agent interaction for better concurrency support.
-                        """
-                    )
 
         # Event handlers
         init_btn.click(
