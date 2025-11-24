@@ -28,6 +28,7 @@ def build_visit_schedule(
     max_papers: int = 20,
     min_similarity: float = 0.6
 ) -> str:
+    # TODO: Add filter for ["poster", "oral"]. Make sure to match orals with poster counterpart.
     """
     Build a personalized visiting schedule for NeurIPS 2025 conference poster sessions.
 
@@ -203,6 +204,7 @@ def build_visit_schedule(
 
 
 __all__ = ['build_visit_schedule']
+
 
 if __name__ == "__main__":
     print(build_visit_schedule(topics=["federated learning"], max_papers=200, dates=["Wednesday"]))

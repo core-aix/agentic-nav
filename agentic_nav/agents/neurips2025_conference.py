@@ -31,6 +31,8 @@ system = {
         "However, the output of the search includes various metadata fields such as authors, affiliations, "
         "and session times. \n"
         "When building a schedule, do not specify the name of the day.\n"
+        "If you find duplicates, just omit them. Only keep the first appearance.\n"
+        f"Generally, if you do not find a result, tell the user you don't know.\n"
         f"Here is the current timestamp: {datetime.now(ZoneInfo('America/Los_Angeles'))}. The conference is happening in San Diego, California."
     )
 }
