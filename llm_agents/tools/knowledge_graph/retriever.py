@@ -23,6 +23,7 @@ LOGGER = logging.getLogger(__name__)
 EMBEDDING_MODEL_NAME = os.environ.get("EMBEDDING_MODEL_NAME", "nomic-embed-text")
 EMBEDDING_MODEL_API_BASE = os.environ.get("EMBEDDING_MODEL_API_BASE", "http://localhost:11435")
 NEO4J_DB_URI = os.environ.get("NEO4J_DB_URI", "bolt://neo4j_db:7687")
+NEO4J_DB_NODE_RETURN_LIMIT = int(os.environ.get("NEO4J_DB_NODE_RETURN_LIMIT", 200))
 
 
 class Neo4jGraphWorker:
@@ -31,8 +32,6 @@ class Neo4jGraphWorker:
     _DB_SIMILARITY_SEARCH_QUERY = """
         CALL db.index.vector.queryNodes('paper_embeddings', $top_k, $query_embedding)
         YIELD node, score
-        OPTIONAL MATCH (a:Author)-[:IS_AUTHOR_OF]->(node)
-        WITH node, score, collect(a) as authors
         RETURN node.id as id,
                node.name as name,
                node.abstract as abstract,
@@ -48,26 +47,46 @@ class Neo4jGraphWorker:
                node.sourceid as sourceid,
                node.virtualsite_url as virtualsite_url,
                node.decision as decision,
-               authors, 
+               [(a:Author)-[:IS_AUTHOR_OF]->(node) | a] as authors,
                score
         ORDER BY score DESC
+        LIMIT $limit
         """
 
-    _DB_NEIGHBORHOOD_SEARCH_QUERY = staticmethod(lambda rel_filter: f"""
-        MATCH (p:Paper)
-        WHERE p.id IN $paper_ids
-        MATCH (p)-[r{rel_filter}]-(neighbor)
-        RETURN p.id as source_paper_id,
-               neighbor,
-               type(r) as relationship_type,
-               properties(r) as relationship_properties,
-               labels(neighbor) as neighbor_labels
-        """)
+    _DB_NEIGHBORHOOD_SEARCH_QUERY = """
+        MATCH (p:Paper)-[r]-(neighbor)
+        WHERE p.id IN $paper_ids 
+          AND type(r) IN $allowed_rel_types
+          AND 'Paper' IN labels(neighbor)
+          AND (type(r) <> 'SIMILAR_TO' OR r.similarity >= $min_similarity)
+        RETURN neighbor.id as id,
+               neighbor.name as name,
+               neighbor.abstract as abstract,
+               neighbor.topic as topic,
+               neighbor.paper_url as paper_url, 
+               neighbor.session as session,
+               neighbor.session_start_time as session_start_time,
+               neighbor.session_end_time as session_end_time,
+               neighbor.presentation_type as presentation_type,
+               neighbor.room_name as room_name,
+               neighbor.project_url as project_url,
+               neighbor.poster_position as poster_position,
+               neighbor.sourceid as sourceid,
+               neighbor.virtualsite_url as virtualsite_url,
+               neighbor.decision as decision,
+               [(a:Author)-[:IS_AUTHOR_OF]->(neighbor) | a] as authors,
+               p.id as source_paper_id,
+               type(r) as relationship_type, 
+               CASE WHEN type(r) = 'SIMILAR_TO' THEN r.similarity ELSE null END as similarity
+        ORDER BY similarity DESC
+        LIMIT $limit
+        """
 
     # Find the DB query for graph traversal in the graph_traversal sub-folder.
     _DB_PAPERS_BY_AUTHOR = """
         MATCH (a:Author)-[:IS_AUTHOR_OF]->(p:Paper)
         WHERE a.fullname = $author_name
+        WITH p, collect(DISTINCT a) as all_authors
         RETURN p.id as id,
                p.name as name,
                p.abstract as abstract,
@@ -83,13 +102,15 @@ class Neo4jGraphWorker:
                p.poster_position as poster_position,
                p.sourceid as sourceid,
                p.virtualsite_url as virtualsite_url,
-               a.fullname as author_name
+               all_authors as authors
         ORDER BY p.name
+        LIMIT $limit
         """
 
     _DB_PAPERS_BY_AUTHOR_FUZZY = """
-        MATCH (p:Paper)-[:AUTHORED_BY]->(a:Author)
+        MATCH (a:Author)-[:IS_AUTHOR_OF]->(p:Paper)
         WHERE toLower(a.fullname) CONTAINS toLower($author_name)
+        WITH p, collect(DISTINCT a) as all_authors
         RETURN p.id as id,
                p.name as name,
                p.abstract as abstract,
@@ -105,8 +126,9 @@ class Neo4jGraphWorker:
                p.poster_position as poster_position,
                p.sourceid as sourceid,
                p.virtualsite_url as virtualsite_url,
-               a.fullname as author_name
+               all_authors as authors
         ORDER BY p.name
+        LIMIT $limit
         """
 
     _DB_PAPERS_BY_TOPIC = """
@@ -126,7 +148,9 @@ class Neo4jGraphWorker:
                p.poster_position as poster_position,
                p.sourceid as sourceid,
                p.virtualsite_url as virtualsite_url,
+               [(a:Author)-[:IS_AUTHOR_OF]->(p) | a] as authors
         ORDER BY p.name
+        LIMIT $limit
         """
 
     _DB_PAPERS_BY_TOPIC_AND_SUBTOPIC = """
@@ -135,7 +159,8 @@ class Neo4jGraphWorker:
         WITH t, collect(DISTINCT subtopic) + t as all_topics
         UNWIND all_topics as topic
         MATCH (p:Paper)-[:BELONGS_TO_TOPIC]->(topic)
-        RETURN DISTINCT p.id as id,
+        WITH DISTINCT p
+        RETURN p.id as id,
                p.name as name,
                p.abstract as abstract,
                p.topic as topic,
@@ -150,30 +175,9 @@ class Neo4jGraphWorker:
                p.poster_position as poster_position,
                p.sourceid as sourceid,
                p.virtualsite_url as virtualsite_url,
+               [(a:Author)-[:IS_AUTHOR_OF]->(p) | a] as authors
         ORDER BY p.name
-        """
-
-    _DB_SIMILAR_PAPER_SEARCH = """
-        MATCH (p1:Paper {id: $paper_id})-[r:SIMILAR_TO]-(p2:Paper)
-        WHERE r.similarity >= $min_similarity
-        RETURN p2.id as id,
-               p2.name as name,
-               p2.abstract as abstract,
-               p2.topic as topic,
-               p2.paper_url as paper_url,
-               p2.decision as decision,
-               p2.session as session,
-               p2.session_start_time as session_start_time,
-               p2.session_end_time as session_end_time,
-               p2.presentation_type as presentation_type,
-               p2.room_name as room_name,
-               p2.project_url as project_url,
-               p2.poster_position as poster_position,
-               p2.sourceid as sourceid,
-               p2.virtualsite_url as virtualsite_url,
-               r.similarity as similarity
-        ORDER BY r.similarity DESC
-        LIMIT $top_k
+        LIMIT $limit
         """
 
     def __init__(
@@ -234,7 +238,12 @@ class Neo4jGraphWorker:
             query_embedding = query_embedding.tolist()
 
         with self.driver.session() as session:
-            result = session.run(self._DB_SIMILARITY_SEARCH_QUERY, query_embedding=query_embedding, top_k=top_k)
+            result = session.run(
+                self._DB_SIMILARITY_SEARCH_QUERY,
+                query_embedding=query_embedding,
+                top_k=top_k,
+                limit=NEO4J_DB_NODE_RETURN_LIMIT
+            )
             papers = []
             for record in result:
                 paper = {
@@ -266,8 +275,8 @@ class Neo4jGraphWorker:
     def neighborhood_search(
             self,
             paper_id: str,
-            relationship_types: Optional[List[str]] = None,
-            include_properties: bool = True
+            relationship_types: List[str] = ["SIMILAR_TO"],
+            min_similarity: float = 0.7
     ) -> Dict[str, Any]:
         """
         Find immediate neighbors of given paper nodes.
@@ -275,60 +284,36 @@ class Neo4jGraphWorker:
         Args:
             paper_id: Paper ID to find neighbors for
             relationship_types: Optional list of relationship types to filter
-                               (e.g., ['SIMILAR_TO', 'AUTHORED_BY', 'BELONGS_TO_TOPIC'])
-            include_properties: Whether to include relationship properties
+                               (e.g., ['SIMILAR_TO', 'IS_AUTHOR_OF', 'BELONGS_TO_TOPIC', 'SUBTOPIC_OF'])
+            min_similarity (float): A minimum similarity score in the range of 0 - 1. Often a good value is 0.75 or 0.8.
+
 
         Returns:
             Dictionary with neighbors grouped by relationship type
         """
+        allowed_rel_types = ['SIMILAR_TO', 'IS_AUTHOR_OF', 'BELONGS_TO_TOPIC', 'SUBTOPIC_OF']
+        for rel_type in relationship_types:
+            if rel_type not in allowed_rel_types:
+                raise ValueError(f"Unsupported relationship type: {rel_type}. Supported relationship types: {allowed_rel_types}")
+
         with self.driver.session() as session:
-            # Build relationship type filter
-            if relationship_types:
-                rel_filter = f":{':'.join(relationship_types)}"
-            else:
-                rel_filter = ""
-
-            query = self._DB_NEIGHBORHOOD_SEARCH_QUERY(rel_filter)
-
-            result = session.run(query, paper_ids=[paper_id])
+            result = session.run(
+                self._DB_NEIGHBORHOOD_SEARCH_QUERY,
+                paper_ids=[paper_id],
+                allowed_rel_types=relationship_types,
+                min_similarity=min_similarity,
+                limit=NEO4J_DB_NODE_RETURN_LIMIT
+            )
 
             # Organize results by relationship type
-            neighbors = {
-                'similar_papers': [],
-                'authors': [],
-                'topics': [],
-                'raw_results': []
-            }
+            neighbors = {}
 
             for record in result:
-
-                neighbor_node = dict(record['neighbor'])
-                rel_type = record['relationship_type']
-                rel_props = record['relationship_properties']
-                labels = record['neighbor_labels']
-
-                if "embedding" in neighbor_node.keys():
-                    del neighbor_node["embedding"]
-
-                neighbor_info = {
-                    'source_paper_id': record['source_paper_id'],
-                    'relationship_type': rel_type,
-                    'neighbor': neighbor_node,
-                    'labels': labels
-                }
-
-                if include_properties and rel_props:
-                    neighbor_info['relationship_properties'] = rel_props
-
-                # Categorize by type
-                if 'Paper' in labels:
-                    neighbors['similar_papers'].append(neighbor_info)
-                elif 'Author' in labels:
-                    neighbors['authors'].append(neighbor_info)
-                elif 'Topic' in labels:
-                    neighbors['topics'].append(neighbor_info)
-
-                neighbors['raw_results'].append(neighbor_info)
+                rel_type = record["relationship_type"]
+                if rel_type not in neighbors.keys():
+                    neighbors[rel_type] = []
+                else:
+                    neighbors[rel_type].append(record)
 
             return neighbors
 
@@ -338,7 +323,7 @@ class Neo4jGraphWorker:
         n_hops: int = 2,
         relationship_type: Optional[str] = None,
         max_results: Optional[int] = None,
-        strategy: str = TraversalStrategy.BFS,
+        strategy: str = "breadth_first_random",
         max_branches: Optional[int] = None,
         random_seed: Optional[int] = None
     ) -> List[Dict[str, Any]]:
@@ -397,76 +382,6 @@ class Neo4jGraphWorker:
         else:
             raise ValueError(f"Unsupported traversal strategy: {strategy}. "
                            f"Supported strategies: breadth_first, depth_first, breadth_first_random, depth_first_random")
-
-    def combined_search_workflow(
-            self,
-            user_query: str,
-            top_k: int = 5,
-            n_hops: int = 2,
-            relationship_types: Optional[List[str]] = None,
-            include_neighborhood: bool = True
-    ) -> Dict[str, Any]:
-        """
-        Combined workflow: similarity search -> neighborhood search -> graph traversal.
-
-        Args:
-            user_query: Query embedding vector
-            top_k: Number of similar papers to find initially
-            n_hops: Number of hops for graph traversal
-            relationship_types: Optional relationship types to consider
-            include_neighborhood: Whether to include immediate neighbors
-
-        Returns:
-            Dictionary containing all search results
-        """
-        # Step 1: Similarity search
-        LOGGER.info(f"Finding {top_k} most similar papers...")
-        similar_papers = self.similarity_search(user_query, top_k)
-
-        if not similar_papers:
-            return {
-                'similar_papers': [],
-                'neighborhood': {},
-                'related_papers': [],
-                'summary': {
-                    'similar_count': 0,
-                    'neighborhood_count': 0,
-                    'related_count': 0
-                }
-            }
-
-        paper_ids = [p['id'] for p in similar_papers]
-
-        # Step 2: Neighborhood search (optional)
-        neighborhood = {}
-        if include_neighborhood:
-            LOGGER.info(f"Finding immediate neighbors...")
-            neighborhood = self.neighborhood_search(paper_ids, relationship_types)
-
-        # Step 3: Graph traversal
-        LOGGER.info(f"Traversing graph with {n_hops} hops...")
-        related_papers = self.graph_traversal(
-            paper_ids,
-            n_hops,
-            relationship_types
-        )
-
-        # Create summary
-        summary = {
-            'similar_count': len(similar_papers),
-            'neighborhood_count': len(neighborhood.get('raw_results', [])),
-            'related_count': len(related_papers),
-            'unique_papers_found': len(set([p['id'] for p in similar_papers + related_papers]))
-        }
-
-        LOGGER.debug(f"Search complete: {summary}")
-
-        return {
-            'similar_papers': similar_papers,
-            'neighborhood': neighborhood,
-            'related_papers': related_papers,
-            'summary': summary
-        }
 
     def search_papers_by_author(
             self,
@@ -537,7 +452,7 @@ class Neo4jGraphWorker:
             else:
                 query = self._DB_PAPERS_BY_TOPIC
 
-            result = session.run(query, topic_name=topic_name)
+            result = session.run(query, topic_name=topic_name, limit=NEO4J_DB_NODE_RETURN_LIMIT)
 
             papers = []
             for record in result:
@@ -557,46 +472,6 @@ class Neo4jGraphWorker:
                     'poster_position': record['poster_position'],
                     'sourceid': record['sourceid'],
                     'virtualsite_url': record['virtualsite_url'],
-                }
-                papers.append(paper)
-
-            return papers
-
-    def find_similar_papers_direct(
-            self,
-            paper_id: str,
-            min_similarity: float = 0.7,
-            top_k: int = 10
-    ) -> List[Dict[str, Any]]:
-        """
-        Find papers directly connected via SIMILAR_TO relationship.
-
-        Args:
-            paper_id: Source paper ID
-            min_similarity: Minimum similarity threshold
-            top_k: Maximum number of results
-
-        Returns:
-            List of similar papers with similarity scores
-        """
-        with self.driver.session() as session:
-            query = self._DB_SIMILAR_PAPER_SEARCH
-
-            result = session.run(
-                query,
-                paper_id=paper_id,
-                min_similarity=min_similarity,
-                top_k=top_k
-            )
-
-            papers = []
-            for record in result:
-                paper = {
-                    'id': record['id'],
-                    'name': record['name'],
-                    'abstract': record['abstract'],
-                    'topic': record['topic'],
-                    'similarity': record['similarity']
                 }
                 papers.append(paper)
 
@@ -679,37 +554,23 @@ if __name__ == "__main__":
             print("Example 2: Neighborhood Search")
             print("=" * 60)
             paper_id = similar_papers[0]['id']
-            neighbors = searcher.neighborhood_search([paper_id])
+            neighbors = searcher.neighborhood_search(paper_id, min_similarity=0.75)
             print(f"\nNeighbors of: {similar_papers[0]['name']}")
-            print(f"  - Similar papers: {len(neighbors['similar_papers'])}")
-            print(f"  - Authors: {len(neighbors['authors'])}")
-            print(f"  - Topics: {len(neighbors['topics'])}")
+            for rel_type, neighbors in neighbors.items():
+                print(f"    \n{rel_type.upper()} RELATIONSHIPS:")
+                for neighbor in neighbors:
+                    print(f"      - {neighbor['name']} (similarity: {neighbor['similarity']:.4f})")
 
         # Example 3: Graph traversal
         print("\n" + "=" * 60)
         print("Example 3: Graph Traversal (2 hops)")
         print("=" * 60)
         if similar_papers:
-            paper_ids = [p['id'] for p in similar_papers[:2]]
+            paper_ids = similar_papers[0]['id']
             related = searcher.graph_traversal(paper_ids, n_hops=2)
             print(f"\nFound {len(related)} related papers through traversal")
             for paper in related[:5]:  # Show first 5
                 print(f"  - {paper['name']} (distance: {paper['distance']})")
-
-        # Example 4: Combined workflow
-        print("\n" + "=" * 60)
-        print("Example 4: Combined Search Workflow")
-        print("=" * 60)
-        results = searcher.combined_search_workflow(
-            user_query,
-            top_k=3,
-            n_hops=2
-        )
-        print(f"\nWorkflow Results:")
-        print(f"  - Initial similar papers: {results['summary']['similar_count']}")
-        print(f"  - Neighborhood connections: {results['summary']['neighborhood_count']}")
-        print(f"  - Related papers (traversal): {results['summary']['related_count']}")
-        print(f"  - Total unique papers: {results['summary']['unique_papers_found']}")
 
     finally:
         searcher.close()

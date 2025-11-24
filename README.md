@@ -24,12 +24,15 @@ Don't forget to set your `OLLAMA_API_KEY` either directly via the environment or
 
 **Important note:** The ollama docker containers cannot use GPU acceleration on MacOS. If you want to use your Mac's GPU, 
 you need to run ollama without containerization (i.e., you need to manually spin up the ollama server). 
+With `NEO4J_DB_NODE_RETURN_LIMIT`, we set a strict return limit of 200 nodes per query to avoid overstraining the database.
+You can set it as needed for your use case.
 
 ```commandline
 # Database config 
 echo "NEO4J_USERNAME=neo4j" >> .env
 echo "NEO4J_PASSWORD=<a password of your choice>" >> .env
 echo "NEO4J_DB_URI=bolt://neo4j_db:7687" >> .env
+echo "NEO4J_DB_NODE_RETURN_LIMIT=200" >> .env
 
 echo "EMBEDDING_MODEL_NAME=nomic-embed-text" >> .env
 echo "EMBEDDING_MODEL_API_BASE=http://ollama_agent:11434" >> .env
@@ -75,6 +78,7 @@ First, export all necessary environment variables:
 echo "NEO4J_USERNAME=neo4j" >> .env
 echo "NEO4J_PASSWORD=<a password of your choice>" >> .env
 echo "NEO4J_DB_URI=bolt://localhost:7687" >> .env
+echo "NEO4J_DB_NODE_RETURN_LIMIT=200" >> .env
 
 echo "EMBEDDING_MODEL_NAME=ollama/nomic-embed-text" >> .env
 echo "EMBEDDING_MODEL_API_BASE=http://localhost:11435" >> .env

@@ -113,6 +113,7 @@ services:
       - EMBEDDING_MODEL_API_BASE=http://ollama_embed:11434
       - AGENT_MODEL_NAME=${AGENT_MODEL_NAME}
       - AGENT_MODEL_API_BASE=http://ollama_agent:11434
+      - NEO4J_DB_NODE_RETURN_LIMIT = ${NEO4J_DB_NODE_RETURN_LIMIT}
     restart: unless-stopped
     networks:
       - llm_agents_net

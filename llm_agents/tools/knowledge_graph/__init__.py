@@ -6,7 +6,7 @@ import os
 import random
 
 from toon_format import encode as toon_encode
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from llm_agents.tools.knowledge_graph.retriever import Neo4jGraphWorker, LOGGER
 
@@ -102,9 +102,9 @@ def search_similar_papers(
 
 def find_neighboring_papers(
         paper_id: str,
-        relationship_types: List[str] = ["SIMILAR_TO"],
-        neighbor_entity: str = "similar_papers",
-        num_neighbors_to_return: int = 10
+        relationship_types: Union[List[str], str] = ["SIMILAR_TO"],
+        num_neighbors_to_return: int = 10,
+        min_similarity: float = 0.75
 ) -> str:
     """
     Retrieve immediate neighboring entities of a specific paper from the Neo4j knowledge graph.
@@ -115,14 +115,15 @@ def find_neighboring_papers(
 
     Args:
         paper_id (str): The unique identifier of the target paper node in the graph. neo4j UUID.
-        relationship_types (List[str], optional): Types of relationships to query.
+        relationship_types (List[str], str): Types of relationships to query.
             Defaults to ["SIMILAR_TO"].
-            Valid options: ["SIMILAR_TO", "AUTHORED_BY", "BELONGS_TO_TOPIC"]
+            Valid options: ["SIMILAR_TO", "IS_AUTHOR_OF", "BELONGS_TO_TOPIC"]
         neighbor_entity (str, optional): The type of neighboring entity to return.
             Defaults to "similar_papers".
             Valid options: ["similar_papers", "authors", "topics", "raw_results"]
         num_neighbors_to_return (int, optional): Maximum number of neighbors to return.
             Defaults to 10. Results are randomly shuffled before truncation to provide diversity.
+        min_similarity (float, optional): Minimum similarity threshold for returned neighbors.
 
     Returns:
         str: A token-efficient formatted string representation of neighboring entities,
@@ -137,7 +138,7 @@ def find_neighboring_papers(
         - Only the three specified relationship types are supported
         - Only the four specified neighbor entity types are supported
         - The neighbor_entity parameter must match the relationship_types used
-          (e.g., "similar_papers" with "SIMILAR_TO", "authors" with "AUTHORED_BY")
+          (e.g., "similar_papers" with "SIMILAR_TO", "authors" with "IS_AUTHOR_OF")
 
     Notes:
         - Results are randomly shuffled to provide diverse recommendations across multiple calls
@@ -160,7 +161,7 @@ def find_neighboring_papers(
         >>>
         >>> authors = find_neighboring_papers(
         ...     paper_id="<UUID>",
-        ...     relationship_types=["AUTHORED_BY"],
+        ...     relationship_types=["IS_AUTHOR_OF"],
         ...     neighbor_entity="authors",
         ...     num_neighbors_to_return=3
         ... )
@@ -181,13 +182,13 @@ def find_neighboring_papers(
     neighbors = worker.neighborhood_search(
         paper_id=paper_id,
         relationship_types=relationship_types,
+        min_similarity=min_similarity,
     )
 
     relevant_neighbors = []
-    for neighbor in neighbors[neighbor_entity]:
-        relevant_neighbors.append({
-            **neighbor["neighbor"]
-        })
+    for rel_type, neighbor in neighbors.items():
+        if rel_type != relationship_types:
+            relevant_neighbors.append(neighbor)
 
     # Constrain and shuffle neighbors for more diverse responses
     random.shuffle(relevant_neighbors)
