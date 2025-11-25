@@ -1,11 +1,11 @@
 """
-Pytest configuration and shared fixtures for the llm_agents test suite.
+Pytest configuration and shared fixtures for the agentic_nav test suite.
 """
 import os
 import pytest
 import tempfile
 from unittest.mock import Mock, patch
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -58,10 +58,10 @@ def temp_dir():
 @pytest.fixture
 def mock_datetime():
     """Mock datetime to return a fixed timestamp."""
-    fixed_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
-    with patch('llm_agents.agents.base.datetime') as mock_dt:
+    fixed_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    with patch('agentic_nav.agents.base.datetime') as mock_dt:
         mock_dt.now.return_value = fixed_time
-        mock_dt.UTC = UTC
+        mock_dt.UTC = timezone.utc
         yield mock_dt
 
 

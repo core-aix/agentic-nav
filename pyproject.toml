@@ -53,7 +53,7 @@ dev = [
 ]
 
 [tool.hatchling.build.targets.wheel]
-packages = ["llm_agents"]
+packages = ["agentic_nav"]
 
 [project.scripts]
 agentic-nav-cli = "agentic_nav.frontend.cli:main"

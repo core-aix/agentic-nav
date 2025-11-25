@@ -35,7 +35,7 @@ agentic-nav-web
 docker compose up neo4j_db ollama_embed ollama_agent -d
 
 # Build knowledge graph from NeurIPS 2025 data
-uv run llm_agents/tools/knowledge_graph/graph_generator.py \
+uv run agentic_nav/tools/knowledge_graph/graph_generator.py \
     --input-json-file data/neurips-2025-orals-posters.json \
     --embedding-model $EMBEDDING_MODEL_NAME \
     --ollama-server-url $EMBEDDING_MODEL_API_BASE \
@@ -45,7 +45,7 @@ uv run llm_agents/tools/knowledge_graph/graph_generator.py \
     --output-file graphs/knowledge_graph.pkl
 
 # Import knowledge graph to Neo4j
-uv run llm_agents/tools/knowledge_graph/neo4j_db_importer.py \
+uv run agentic_nav/tools/knowledge_graph/neo4j_db_importer.py \
     --graph-path graphs/knowledge_graph.pkl \
     --neo4j-uri bolt://localhost:7687 \
     --batch-size 100 \
@@ -58,7 +58,7 @@ uv run llm_agents/tools/knowledge_graph/neo4j_db_importer.py \
 uv run pytest tests/
 
 # Run tests with coverage report
-uv run pytest tests/ --cov=llm_agents --cov-report=term-missing
+uv run pytest tests/ --cov=agentic_nav --cov-report=term-missing
 
 # Alternative: Use the custom test runner
 python run_tests.py
@@ -81,7 +81,7 @@ uv run pytest tests/agents/test_base.py
 uv run pytest tests/ -v
 
 # Generate HTML coverage report
-uv run pytest tests/ --cov=llm_agents --cov-report=html
+uv run pytest tests/ --cov=agentic_nav --cov-report=html
 # View coverage report at htmlcov/index.html
 
 # Note: Always specify tests/ directory to avoid conflicts with gradio workspace
@@ -100,22 +100,22 @@ bash scripts/import_neurips2025_kg.sh
 
 ### Core Components
 
-1. **Agent System (`llm_agents/agents/`)**
+1. **Agent System (`agentic_nav/agents/`)**
    - `base.py`: Core LLMAgent class with streaming support and tool execution
    - `neurips2025_conference.py`: Specialized agent for NeurIPS 2025 conference data
    - Uses LiteLLM for model abstraction, supports Ollama models
 
-2. **Tools System (`llm_agents/tools/`)**
+2. **Tools System (`agentic_nav/tools/`)**
    - Knowledge graph tools: `search_similar_papers`, `find_neighboring_papers`, `traverse_graph`
    - Graph traversal strategies: breadth-first, depth-first, neo4j builtin
    - Tool registry automatically discovers callable functions
 
-3. **Frontend (`llm_agents/frontend/`)**
+3. **Frontend (`agentic_nav/frontend/`)**
    - `cli.py`: Rich terminal interface with streaming, command history, auto-completion
    - `browser_ui.py`: Gradio web interface for browser-based interactions
    - Both interfaces support the same agent functionality
 
-4. **Knowledge Graph (`llm_agents/tools/knowledge_graph/`)**
+4. **Knowledge Graph (`agentic_nav/tools/knowledge_graph/`)**
    - Neo4j-based paper similarity and relationship storage
    - Embedding-based vector search for paper discovery
    - Support for graph traversal algorithms
