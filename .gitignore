@@ -143,6 +143,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.idea/
 
 # Spyder project settings
 .spyderproject
@@ -210,3 +211,5 @@ __marimo__/
 data/*.json
 .vscode/
 rag_index_json/
+*.pkl
+*.json

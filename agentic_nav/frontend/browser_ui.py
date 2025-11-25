@@ -1,0 +1,561 @@
+"""
+Gradio web UI that interacts with an agent implementation.
+
+Features matching terminal UI:
+- Multi-turn chat with Markdown rendering
+- System prompt editing
+- View conversation history
+- Save chat history to file
+- All model configuration options
+- Clear chat functionality
+- **Per-user conversation state management with stateless agent**
+"""
+import gradio as gr
+import os
+import datetime
+import logging
+import json
+
+from pathlib import Path
+from typing import List, Tuple, Optional, Dict
+
+from agentic_nav.agents import NeurIPS2025Agent, DEFAULT_NEURIPS2025_AGENT_ARGS, AGENT_INTRODUCTION_PROMPT
+from agentic_nav.utils.logger import setup_logging
+from agentic_nav.utils.file_handlers import save_chat_history
+
+
+LOGGER = logging.getLogger(__name__)
+
+EMBEDDING_MODEL_NAME = os.environ.get("EMBEDDING_MODEL_NAME", "ollama/nomic-embed-text")
+EMBEDDING_MODEL_API_BASE = os.environ.get("EMBEDDING_MODEL_API_BASE", "http://localhost:11435")
+
+AGENT_MODEL_NAME = os.environ.get("AGENT_MODEL_NAME", "ollama_chat/gpt-oss:20b")
+AGENT_MODEL_API_BASE = os.environ.get("AGENT_MODEL_API_BASE", "http://localhost:11436")
+OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY", DEFAULT_NEURIPS2025_AGENT_ARGS["api_key"])
+
+
+def initialize_agent():
+    """Initialize the AGENT instance."""
+    agent = NeurIPS2025Agent(
+        model=f"ollama_chat/{AGENT_MODEL_NAME}",
+        api_base=AGENT_MODEL_API_BASE,
+        api_key=OLLAMA_API_KEY,
+        llm_args=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"],
+        global_tool_args=DEFAULT_NEURIPS2025_AGENT_ARGS["global_tool_args"],
+    )
+    agent.setup_session()
+    return agent
+
+
+def configure_agent(
+        api_base: str,
+        api_key: str,
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        num_ctx: int,
+        max_num_papers: int,
+        current_config: Dict
+):
+    """Initialize the agent with a given configuration."""
+    LOGGER.info(f"Agent runtime started via Gradio UI for session")
+    current_config.update({
+        "model": model,
+        "api_base": api_base,
+        "api_key": api_key,
+        "llm_args": {
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "num_ctx": num_ctx
+        },
+        "global_tool_args": {"max_num_papers": max_num_papers}
+    })
+
+    current_config_to_print = current_config.copy()
+    if "api_key" in current_config_to_print:
+        del current_config_to_print["api_key"]
+    LOGGER.info(f"User-defined configuration saved. Config: {current_config_to_print}")
+
+    return current_config, "✓ Agent configuration updated successfully!"
+
+
+def chat_fn(
+        new_message: str,
+        history: List[Dict],
+        config: Optional[Dict],
+        messages: Optional[List[Dict]],
+        agent: NeurIPS2025Agent,
+) -> Tuple[List[Dict], Optional[List[Dict]]]:
+    """
+    Handle chat interaction using stateless agent.
+
+    Args:
+        new_message: User's input message
+        history: Chat history as list of message dictionaries with role/content
+        config: Configuration dict with model, api_base, api_key, llm_args
+        messages: Current conversation messages list
+        agent: Agent instance
+
+    Returns:
+        Tuple of (updated_history, messages)
+    """
+    if not new_message.strip():
+        yield history, messages
+        return
+
+    LOGGER.debug(f"USER PROMPT: {new_message}")
+
+    # Safety check: ensure messages is a list
+    if messages is None or not isinstance(messages, list):
+        LOGGER.warning("Messages state was not properly initialized, resetting...")
+        messages = [agent.get_system_prompt()]
+
+    # Create a copy of history and messages to avoid mutation issues
+    history = history.copy() if history else []
+    messages = messages.copy()
+
+    # Add user message to history immediately with empty assistant response
+    user_msg_dict = {"role": "user", "content": new_message}
+    assistant_msg_dict = {"role": "assistant", "content": ""}
+    history.extend([user_msg_dict, assistant_msg_dict])
+
+    try:
+        # Create user message with timestamp
+        user_message = {
+            "role": "user",
+            "content": new_message,
+            "_ts": str(datetime.datetime.now(datetime.timezone.utc))
+        }
+
+        # Add user message to conversation
+        messages.append(user_message)
+
+        # Stream the response
+        accumulated_response = ""
+        partial_messages = ""
+        for partial_messages in agent.interact_stateless(
+                messages=messages,
+                model=config["model"],
+                api_base=config["api_base"],
+                api_key=config["api_key"],
+                llm_args=config["llm_args"]
+        ):
+            # Get the latest assistant message content
+            for msg in reversed(partial_messages):
+                if msg.get("role") == "assistant":
+                    accumulated_response = msg["content"]
+                    break
+
+            # Update the last assistant message in history with accumulated response
+            if len(accumulated_response) == 0:
+                history[-1]["content"] = "Working on it. Hang tight..."
+            else:
+                history[-1]["content"] = accumulated_response
+
+            yield history, partial_messages
+
+        # Final update with complete messages
+        messages = partial_messages
+        LOGGER.info("Agent response generated successfully")
+
+    except Exception as e:
+        LOGGER.error(f"Agent encountered an error: {e}", exc_info=True)
+        error_msg = f"❌ Error: {str(e)}"
+        history[-1]["content"] = error_msg
+        yield history, messages
+
+
+def update_system_prompt(
+    new_prompt: str,
+    messages: Optional[List[Dict]],
+    agent: NeurIPS2025Agent
+) -> Tuple[str, Optional[List[Dict]]]:
+    """Update the system prompt in the message history.
+
+    Args:
+        new_prompt: New system prompt
+        messages: Current message history
+        agent: Agent instance
+
+    Returns:
+        Tuple of (status_message, agent_instance, config, updated_messages)
+    """
+    if not new_prompt.strip():
+        return "System prompt cannot be empty.", messages
+
+    try:
+        # Initialize messages if None
+        if messages is None:
+            messages = []
+
+        # Use the static method to update system prompt
+        messages = agent.set_system_prompt(new_system_prompt=new_prompt, messages=messages)
+
+        LOGGER.info("System prompt updated")
+        LOGGER.info(f"New system prompt: {messages[0]}")
+        return "✓ System prompt updated successfully!", messages
+    except Exception as e:
+        LOGGER.error(f"Error updating system prompt: {e}")
+        return f"Error: {str(e)}", messages
+
+
+def view_history(messages: Optional[List[Dict]]) -> str:
+    """View the full conversation history in JSON format.
+
+    Args:
+        messages: Current message history
+
+    Returns:
+        JSON formatted history string
+    """
+    if messages is None:
+        return "⚠️ No conversation history yet."
+
+    try:
+        # Format as pretty JSON
+        return json.dumps(messages, indent=2, ensure_ascii=False)
+    except Exception as e:
+        LOGGER.error(f"Error viewing history: {e}")
+        return f"❌ Error: {str(e)}"
+
+
+def save_history(filename: str, messages: Optional[List[Dict]]) -> str:
+    """Save chat history to a JSON file.
+
+    Args:
+        filename: Optional filename
+        messages: Current message history
+
+    Returns:
+        Status message
+    """
+    if messages is None or len(messages) == 0:
+        return "⚠️ No conversation history to save."
+
+    try:
+        # Create directory if it doesn't exist
+        Path("chat_histories/").mkdir(exist_ok=True, parents=True)
+
+        # Generate filename if not provided
+        if not filename.strip():
+            time_now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # Add session identifier to prevent conflicts
+            import uuid
+            session_id = str(uuid.uuid4())[:8]
+            filename = f"chat_histories/{time_now}_session_{session_id}_chat_history.json"
+        else:
+            filename = filename.strip()
+            # Ensure it's in chat_histories directory
+            if not filename.startswith("chat_histories/"):
+                filename = f"chat_histories/{filename}"
+            if not filename.endswith(".json"):
+                filename += ".json"
+
+        # Save the history
+        save_chat_history(messages, filename)
+
+        LOGGER.info(f"Chat history saved to {filename}")
+        return f"✓ Chat history saved to: {filename}"
+
+    except Exception as e:
+        LOGGER.error(f"Error saving history: {e}")
+        return f"❌ Error: {str(e)}"
+
+
+def clear_chat(
+        config: Optional[Dict],
+        messages: Optional[List[Dict]],
+        agent: NeurIPS2025Agent
+) -> Tuple[List, Optional[List[Dict]]]:
+    """Clear the chat history in the UI and reset message list.
+
+    Args:
+        config: Current configuration
+        messages: Current message history
+        agent: Agent instance
+
+    Returns:
+        Tuple of (status_message, empty_history, reset_messages)
+    """
+    system_prompt = agent.get_system_prompt()
+    if isinstance(system_prompt, dict):
+        reset_messages = [system_prompt]
+    else:
+        reset_messages = []
+
+    LOGGER.info("Chat cleared and reset")
+    return [], reset_messages
+
+
+def submit_message(message, history, config, messages, agent):
+    """Wrapper to clear input and process message"""
+    yield from chat_fn(message, history, config, messages, agent)
+
+
+def main():
+
+    # Setup the agent instance
+    agent = initialize_agent()
+
+    with gr.Blocks(
+        title="AgenticNAV",
+        theme=gr.themes.Default(
+            spacing_size=gr.themes.sizes.spacing_md,
+            font=[gr.themes.GoogleFont("Inconsolata"), "Arial", "sans-serif"],
+            radius_size=gr.themes.sizes.radius_sm,
+            primary_hue=gr.themes.colors.slate,
+            secondary_hue=gr.themes.colors.blue
+        ),
+            css="""
+            #submit_textbox button {
+                background-color: #ff6b6b !important;
+                border-color: #ff6b6b !important;
+            }
+            #submit_textbox button:hover {
+                background-color: #ee5a52 !important;
+                border-color: #ee5a52 !important;
+            }
+            
+            .scrollable-div {
+                display: flex;
+                overflow-x: auto;
+                min-width: 200px;
+            }
+            
+            """
+    ) as webapp:
+
+        gr.Markdown("""
+        # 🤖 AgenticNAV - Explore NeurIPS 2025 papers and build your personalized schedule, effortlessly!
+        
+        This agent can help you explore the more than 5000 papers at this year's NeurIPS conference. 
+        You can start chatting right away but see below for more specific instructions on how to use the agent with your 
+        favorite model and inference config. You can also set a custom system prompt.
+        
+        **Note:** This is an experimental deployment and LLMs can make mistakes. This can mean that the agent may not 
+        discover your paper even though it is presented at the conference. Also, note that the ordering of authors may 
+        not be correct. Check the paper links for more details.
+        
+        """)
+
+        # Session state for agent instance, config, and messages
+        config_state = gr.State(value=DEFAULT_NEURIPS2025_AGENT_ARGS)
+        messages_state = gr.State(value=[agent.get_system_prompt(), AGENT_INTRODUCTION_PROMPT])
+
+        with gr.Row():
+            with gr.Column():
+                # Main chat interface
+                chatbot = gr.Chatbot(
+                    value=messages_state.value,
+                    label="Conversation",
+                    height=750,
+                    type="messages",
+                    show_copy_button=True,
+                    sanitize_html=True
+                )
+
+                with gr.Row():
+                    msg_input = gr.Textbox(
+                        label="Your message",
+                        placeholder="Type your message here...",
+                        # lines=1,
+                        scale=4,
+                        show_label=False,
+                        interactive=True,
+                        submit_btn=True,
+                        autofocus=True,
+                        elem_id="submit_textbox",
+                        # stop_btn=True TODO: Allow users to stop the conversation!
+                    )
+                    # submit_btn = gr.Button("Send", variant="primary", scale=1)
+
+                with gr.Row():
+                    clear_btn = gr.Button("🗑️ Clear Chat", size="sm")
+                    # save_btn = gr.Button("💾 Save History", size="sm")
+
+        with gr.Row():
+            with gr.Column(scale=1):
+                gr.Markdown("""
+                    ### 📖 Usage Guide
+                    
+                    **You can start chatting with AgenticNAV right away.** 
+                    Note that we provide a default key for Ollama that may reach its quota quickly (depending on demand). 
+                    If you see that the agent cannot respond, please provide your own Ollama API key (see below for details). 
+                    
+                    #### Updating the client config 
+                    1. Open the "Configuration" tab in the Settings column
+                    2. Add your API key and make any other changes you'd like
+                    3. Click "Update Config" to save the changes
+                    
+                    #### Setting a custom system prompt
+                    You can set a custom system prompt to customize the behavior of the agent in the "System Prompt" tab
+                    
+                    #### Viewing the complete history
+                    Open the "History & Save" tab to see the full details on your conversation and what gets passed between 
+                    user and agent.
+    
+                    ### _Note on Ollama API Keys_
+                    In case you are experiencing an error calling the agent model (usually indicated by a message 
+                    containing the word "unauthorized"), you may go to https://ollama.com and generate your own key. 
+                    You can provide it in the Agent Settings. It will not be stored on our system and gets deleted 
+                    when you end your session (i.e., close your browser window).
+    
+                    **Note**: Each browser session maintains its own independent conversation state that will be deleted as you close the browser window. It will never be stored on our server.
+                    """
+                )
+
+            with gr.Column(scale=2):
+                # Settings panel
+                gr.Markdown("### ⚙️ Agent Settings")
+
+                with gr.Accordion("Configuration", open=False):
+                    api_base_input = gr.Textbox(
+                        label="API Base URL (leave empty when using OpenAI, Anthropic, etc.)",
+                        value=AGENT_MODEL_API_BASE,
+                        placeholder="http://localhost:11434"
+                    )
+
+                    api_key_input = gr.Textbox(
+                        label="API Key",
+                        value="",
+                        type="password",
+                        placeholder="Please provide one if our quote is exceeded."
+                    )
+
+                    model_input = gr.Textbox(
+                        label="Model",
+                        value=AGENT_MODEL_NAME,
+                        placeholder="ollama_chat/gpt-oss:120b-cloud"
+                    )
+
+                    temperature_input = gr.Slider(
+                        label="Temperature",
+                        minimum=0.0,
+                        maximum=1.0,
+                        value=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["temperature"],
+                        step=0.1
+                    )
+
+                    max_tokens_input = gr.Slider(
+                        label="Max Tokens",
+                        minimum=100,
+                        maximum=32768,
+                        value=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["max_tokens"],
+                        step=10
+                    )
+
+                    num_ctx_input = gr.Slider(
+                        label="Context Window (may not have an effect on some models and providers)",
+                        minimum=1024,
+                        maximum=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["num_ctx"],
+                        value=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["num_ctx"],
+                        step=128
+                    )
+
+                    max_papers_input = gr.Slider(
+                        label="Max Papers to Retrieve",
+                        minimum=0,
+                        maximum=100,
+                        value=50,
+                        step=1
+                    )
+
+                    init_btn = gr.Button("Update Config", variant="primary")
+                    init_status = gr.Textbox(label="Status", interactive=False)
+
+                with gr.Accordion("System Prompt", open=False):
+                    system_prompt_input = gr.Textbox(
+                        label="System Prompt",
+                        value=agent.get_system_prompt()["content"] if type(agent.get_system_prompt()) is dict else None,
+                        placeholder="Enter custom system prompt here...",
+                        lines=12
+                    )
+                    update_system_btn = gr.Button("Update System Prompt")
+                    system_status = gr.Textbox(label="Status", interactive=False)
+
+                with gr.Accordion("History & Save", open=False):
+                    view_history_btn = gr.Button("📜 View Full History")
+                    gr.Markdown(f"**Note:** If you'd like to download the conversation, use the download button below (upper right corner).")
+                    history_output = gr.Code(
+                        label="Conversation History (JSON)",
+                        language="json",
+                        lines=10
+                    )
+
+                    # save_filename_input = gr.Textbox(
+                    #     label="Filename (optional)",
+                    #     placeholder="Leave empty for auto-generated name",
+                    #    value=""
+                    # )
+                    # save_status = gr.Textbox(label="Save Status", interactive=False)
+
+        # Event handlers
+        init_btn.click(
+            fn=configure_agent,
+            inputs=[
+                api_base_input,
+                api_key_input,
+                model_input,
+                temperature_input,
+                max_tokens_input,
+                num_ctx_input,
+                max_papers_input,
+                config_state
+            ],
+            outputs=[config_state, init_status]
+        )
+
+        msg_input.submit(
+            fn=lambda msg_input, chatbot, config_state, messages_state: (yield from submit_message(msg_input, chatbot, config_state, messages_state, agent)),
+            inputs=[msg_input, chatbot, config_state, messages_state],
+            outputs=[chatbot, messages_state]
+        ).then(
+            fn=lambda: "",
+            inputs=None,
+            outputs=msg_input
+        )
+
+        # System prompt update
+        update_system_btn.click(
+            fn=lambda system_prompt_input, messages_state: update_system_prompt(system_prompt_input, messages_state, agent),
+            inputs=[system_prompt_input, messages_state],
+            outputs=[system_status, messages_state]
+        )
+
+        # History viewing
+        view_history_btn.click(
+            fn=view_history,
+            inputs=messages_state,
+            outputs=history_output
+        )
+
+        # Save history
+        # save_btn.click(
+        #     fn=save_history,
+        #     inputs=[save_filename_input, messages_state],
+        #     outputs=save_status
+        # )
+
+        # Clear chat
+        clear_btn.click(
+            fn=lambda config_state, messages_state: clear_chat(config_state, messages_state, agent),
+            inputs=[config_state, messages_state],
+            outputs=[chatbot, messages_state]
+        )
+
+    webapp.launch(
+        server_name="0.0.0.0",  # Allow external connections
+        server_port=7860,  # Default Gradio port
+        share=False,  # Set to True to create a public link
+        show_error=True,
+        debug=True
+    )
+
+if __name__ == "__main__":
+    # Setup logging (only needs to be done once globally)
+    setup_logging(
+        log_dir="logs",
+        level=os.environ.get("AGENTIC_NAV_LOG_LEVEL", "INFO")
+    )
+
+    main()
