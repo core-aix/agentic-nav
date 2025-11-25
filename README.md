@@ -5,7 +5,7 @@ colorFrom: blue
 colorTo: indigo
 sdk: gradio
 sdk_version: 5.50.0
-app_file: agentic_nav/frontend/browser_ui.py
+app_file: app.py
 python_version: 3.13
 pinned: true
 hf_oauth: true
