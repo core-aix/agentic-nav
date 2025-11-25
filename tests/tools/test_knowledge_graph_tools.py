@@ -9,12 +9,12 @@ from unittest.mock import patch, Mock, MagicMock
 
 def reload_knowledge_graph_module():
     """Reload the knowledge graph module to pick up environment changes."""
-    if 'llm_agents.tools.knowledge_graph' in sys.modules:
-        importlib.reload(sys.modules['llm_agents.tools.knowledge_graph'])
+    if 'agentic_nav.tools.knowledge_graph' in sys.modules:
+        importlib.reload(sys.modules['agentic_nav.tools.knowledge_graph'])
     else:
-        import llm_agents.tools.knowledge_graph
+        import agentic_nav.tools.knowledge_graph
 
-    from llm_agents.tools.knowledge_graph import (
+    from agentic_nav.tools.knowledge_graph import (
         search_similar_papers,
         find_neighboring_papers,
         traverse_graph
@@ -30,13 +30,13 @@ class TestSearchSimilarPapers:
     #     with patch.dict('os.environ', {
     #         'NEO4J_URI': 'bolt://localhost:7687',
     #         'NEO4J_USERNAME': 'neo4j',
-    #         'NEO4J_PASSWORD': 'llm_agents'
+    #         'NEO4J_PASSWORD': 'agentic_nav'
     #     }):
     #         # Reload module to pick up patched environment variables
     #         search_similar_papers, _, _ = reload_knowledge_graph_module()
     #
-    #         with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
-    #              patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode:
+    #         with patch('agentic_nav.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+    #              patch('agentic_nav.tools.knowledge_graph.toon_encode') as mock_encode:
     #
     #             # Mock the worker instance
     #             mock_worker = Mock()
@@ -63,7 +63,7 @@ class TestSearchSimilarPapers:
     #             mock_worker_class.assert_called_once_with(
     #                 uri='bolt://localhost:7687',
     #                 username='neo4j',
-    #                 password='llm_agents'
+    #                 password='agentic_nav'
     #             )
     #
     #             # Verify search was called correctly
@@ -84,13 +84,13 @@ class TestSearchSimilarPapers:
         with patch.dict('os.environ', {
             'NEO4J_URI': 'bolt://localhost:7687',
             'NEO4J_USERNAME': 'neo4j',
-            'NEO4J_PASSWORD': 'llm_agents'
+            'NEO4J_PASSWORD': 'agentic_nav'
         }):
             # Reload module to pick up patched environment variables
             search_similar_papers, _, _ = reload_knowledge_graph_module()
 
-            with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
-                 patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode:
+            with patch('agentic_nav.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+                 patch('agentic_nav.tools.knowledge_graph.toon_encode') as mock_encode:
 
                 mock_worker = Mock()
                 mock_worker_class.return_value = mock_worker
@@ -102,8 +102,10 @@ class TestSearchSimilarPapers:
                 # Verify default parameters were used
                 mock_worker.similarity_search.assert_called_once_with(
                     user_query="test query",
-                    top_k=10,  # default
-                    min_similarity=None  # default
+                    top_k=50,  # default changed from 10 to 50
+                    min_similarity=None,  # default
+                    day=None,  # new parameter
+                    timeslots=None  # new parameter
                 )
 
     # @pytest.mark.no_auto_env
@@ -118,8 +120,8 @@ class TestSearchSimilarPapers:
     #         search_similar_papers, _, _ = reload_knowledge_graph_module()
     #
     #         with patch('neo4j.GraphDatabase.driver') as mock_driver, \
-    #              patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode, \
-    #              patch('llm_agents.utils.embedding_generator.embedding') as mock_embedding:
+    #              patch('agentic_nav.tools.knowledge_graph.toon_encode') as mock_encode, \
+    #              patch('agentic_nav.utils.embedding_generator.embedding') as mock_embedding:
     #
     #             # Setup the Neo4j driver mock
     #             mock_driver_instance = Mock()
@@ -167,14 +169,14 @@ class TestFindNeighboringPapers:
     #     with patch.dict('os.environ', {
     #         'NEO4J_URI': 'bolt://localhost:7687',
     #         'NEO4J_USERNAME': 'neo4j',
-    #         'NEO4J_PASSWORD': 'llm_agents'
+    #         'NEO4J_PASSWORD': 'agentic_nav'
     #     }):
     #         # Reload module to pick up patched environment variables
     #         _, find_neighboring_papers, _ = reload_knowledge_graph_module()
     #
-    #         with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
-    #              patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode, \
-    #              patch('llm_agents.tools.knowledge_graph.random.shuffle') as mock_shuffle:
+    #         with patch('agentic_nav.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+    #              patch('agentic_nav.tools.knowledge_graph.toon_encode') as mock_encode, \
+    #              patch('agentic_nav.tools.knowledge_graph.random.shuffle') as mock_shuffle:
     #
     #             mock_worker = Mock()
     #             mock_worker_class.return_value = mock_worker
@@ -200,7 +202,7 @@ class TestFindNeighboringPapers:
     #             mock_worker_class.assert_called_once_with(
     #                 uri='bolt://localhost:7687',
     #                 username='neo4j',
-    #                 password='llm_agents'
+    #                 password='agentic_nav'
     #             )
     #
     #             # Verify neighborhood search
@@ -222,13 +224,13 @@ class TestFindNeighboringPapers:
         with patch.dict('os.environ', {
             'NEO4J_URI': 'bolt://localhost:7687',
             'NEO4J_USERNAME': 'neo4j',
-            'NEO4J_PASSWORD': 'llm_agents'
+            'NEO4J_PASSWORD': 'agentic_nav'
         }):
             # Reload module to pick up patched environment variables
             _, find_neighboring_papers, _ = reload_knowledge_graph_module()
 
-            with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
-                 patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode:
+            with patch('agentic_nav.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+                 patch('agentic_nav.tools.knowledge_graph.toon_encode') as mock_encode:
 
                 mock_worker = Mock()
                 mock_worker_class.return_value = mock_worker
@@ -237,14 +239,14 @@ class TestFindNeighboringPapers:
 
                 find_neighboring_papers(
                     paper_id="test_id",
-                    relationship_types="SIMILAR_TO",  # String instead of list
-                    neighbor_entity="similar_papers"
+                    relationship_types="SIMILAR_TO"  # String instead of list
                 )
 
                 # Should convert string to list
                 mock_worker.neighborhood_search.assert_called_once_with(
                     paper_id="test_id",
-                    relationship_types=["SIMILAR_TO"]
+                    relationship_types=["SIMILAR_TO"],
+                    min_similarity=0.75  # default
                 )
 
     def test_find_neighboring_papers_defaults(self):
@@ -252,13 +254,13 @@ class TestFindNeighboringPapers:
         with patch.dict('os.environ', {
             'NEO4J_URI': 'bolt://localhost:7687',
             'NEO4J_USERNAME': 'neo4j',
-            'NEO4J_PASSWORD': 'llm_agents'
+            'NEO4J_PASSWORD': 'agentic_nav'
         }):
             # Reload module to pick up patched environment variables
             _, find_neighboring_papers, _ = reload_knowledge_graph_module()
 
-            with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
-                 patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode:
+            with patch('agentic_nav.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+                 patch('agentic_nav.tools.knowledge_graph.toon_encode') as mock_encode:
 
                 mock_worker = Mock()
                 mock_worker_class.return_value = mock_worker
@@ -270,7 +272,8 @@ class TestFindNeighboringPapers:
                 # Verify defaults are used
                 mock_worker.neighborhood_search.assert_called_once_with(
                     paper_id="test_id",
-                    relationship_types=["SIMILAR_TO"]  # default
+                    relationship_types=["SIMILAR_TO"],  # default
+                    min_similarity=0.75  # default
                 )
 
 
@@ -282,13 +285,13 @@ class TestTraverseGraph:
     #     with patch.dict('os.environ', {
     #         'NEO4J_URI': 'bolt://localhost:7687',
     #         'NEO4J_USERNAME': 'neo4j',
-    #         'NEO4J_PASSWORD': 'llm_agents'
+    #         'NEO4J_PASSWORD': 'agentic_nav'
     #     }):
     #         # Reload module to pick up patched environment variables
     #         _, _, traverse_graph = reload_knowledge_graph_module()
     #
-    #         with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
-    #              patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode:
+    #         with patch('agentic_nav.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+    #              patch('agentic_nav.tools.knowledge_graph.toon_encode') as mock_encode:
     #
     #             mock_worker = Mock()
     #             mock_worker_class.return_value = mock_worker
@@ -314,7 +317,7 @@ class TestTraverseGraph:
     #             mock_worker_class.assert_called_once_with(
     #                 uri='bolt://localhost:7687',
     #                 username='neo4j',
-    #                 password='llm_agents'
+    #                 password='agentic_nav'
     #             )
     #
     #             # Verify traversal call
@@ -338,13 +341,13 @@ class TestTraverseGraph:
         with patch.dict('os.environ', {
             'NEO4J_URI': 'bolt://localhost:7687',
             'NEO4J_USERNAME': 'neo4j',
-            'NEO4J_PASSWORD': 'llm_agents'
+            'NEO4J_PASSWORD': 'agentic_nav'
         }):
             # Reload module to pick up patched environment variables
             _, _, traverse_graph = reload_knowledge_graph_module()
 
-            with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
-                 patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode:
+            with patch('agentic_nav.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+                 patch('agentic_nav.tools.knowledge_graph.toon_encode') as mock_encode:
 
                 mock_worker = Mock()
                 mock_worker_class.return_value = mock_worker
@@ -369,13 +372,13 @@ class TestTraverseGraph:
         with patch.dict('os.environ', {
             'NEO4J_URI': 'bolt://localhost:7687',
             'NEO4J_USERNAME': 'neo4j',
-            'NEO4J_PASSWORD': 'llm_agents'
+            'NEO4J_PASSWORD': 'agentic_nav'
         }):
             # Reload module to pick up patched environment variables
             _, _, traverse_graph = reload_knowledge_graph_module()
 
-            with patch('llm_agents.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
-                 patch('llm_agents.tools.knowledge_graph.toon_encode') as mock_encode:
+            with patch('agentic_nav.tools.knowledge_graph.Neo4jGraphWorker') as mock_worker_class, \
+                 patch('agentic_nav.tools.knowledge_graph.toon_encode') as mock_encode:
 
                 mock_worker = Mock()
                 mock_worker_class.return_value = mock_worker

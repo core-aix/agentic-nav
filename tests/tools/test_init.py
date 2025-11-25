@@ -1,15 +1,16 @@
 from unittest.mock import patch, Mock
 import pytest
 
-from llm_agents.tools import get_all_tools
-from llm_agents.tools.knowledge_graph import search_similar_papers, find_neighboring_papers, traverse_graph
+from agentic_nav.tools import get_all_tools
+from agentic_nav.tools.knowledge_graph import search_similar_papers, find_neighboring_papers, traverse_graph
+from agentic_nav.tools.session_routing import build_visit_schedule
 
 class TestGetAllTools:
     """Test the get_all_tools function."""
 
-    @patch('llm_agents.tools.knowledge_graph.search_similar_papers')
-    @patch('llm_agents.tools.knowledge_graph.find_neighboring_papers')
-    @patch('llm_agents.tools.knowledge_graph.traverse_graph')
+    @patch('agentic_nav.tools.knowledge_graph.search_similar_papers')
+    @patch('agentic_nav.tools.knowledge_graph.find_neighboring_papers')
+    @patch('agentic_nav.tools.knowledge_graph.traverse_graph')
     def test_get_all_tools_returns_list(self, mock_traverse, mock_neighbors, mock_search):
         """Test that get_all_tools returns a list of all tools."""
         # Mock the tool functions
@@ -27,20 +28,20 @@ class TestGetAllTools:
         # Verify return type is list
         assert isinstance(result, list)
 
-    @patch('llm_agents.tools.knowledge_graph.search_similar_papers')
-    @patch('llm_agents.tools.knowledge_graph.find_neighboring_papers')
-    @patch('llm_agents.tools.knowledge_graph.traverse_graph')
+    @patch('agentic_nav.tools.knowledge_graph.search_similar_papers')
+    @patch('agentic_nav.tools.knowledge_graph.find_neighboring_papers')
+    @patch('agentic_nav.tools.knowledge_graph.traverse_graph')
     def test_get_all_tools_returns_correct_count(self, mock_traverse, mock_neighbors, mock_search):
         """Test that get_all_tools returns the correct number of tools."""
         # Call the function
         result = get_all_tools()
 
-        # Verify we get exactly 3 tools
-        assert len(result) == 3
+        # Verify we get exactly 4 tools
+        assert len(result) == 4
 
-    @patch('llm_agents.tools.knowledge_graph.search_similar_papers')
-    @patch('llm_agents.tools.knowledge_graph.find_neighboring_papers')
-    @patch('llm_agents.tools.knowledge_graph.traverse_graph')
+    @patch('agentic_nav.tools.knowledge_graph.search_similar_papers')
+    @patch('agentic_nav.tools.knowledge_graph.find_neighboring_papers')
+    @patch('agentic_nav.tools.knowledge_graph.traverse_graph')
     def test_get_all_tools_contains_all_expected_tools(self, mock_traverse, mock_neighbors, mock_search):
         """Test that get_all_tools contains all expected tool functions."""
         # Call the function
@@ -50,10 +51,11 @@ class TestGetAllTools:
         assert search_similar_papers in result
         assert find_neighboring_papers in result
         assert traverse_graph in result
+        assert build_visit_schedule in result
 
-    @patch('llm_agents.tools.knowledge_graph.search_similar_papers')
-    @patch('llm_agents.tools.knowledge_graph.find_neighboring_papers')
-    @patch('llm_agents.tools.knowledge_graph.traverse_graph')
+    @patch('agentic_nav.tools.knowledge_graph.search_similar_papers')
+    @patch('agentic_nav.tools.knowledge_graph.find_neighboring_papers')
+    @patch('agentic_nav.tools.knowledge_graph.traverse_graph')
     def test_get_all_tools_order_matches_all_declaration(self, mock_traverse, mock_neighbors, mock_search):
         """Test that get_all_tools returns tools in the same order as __all__."""
         # Call the function
@@ -63,6 +65,7 @@ class TestGetAllTools:
         assert result[0] == search_similar_papers
         assert result[1] == find_neighboring_papers
         assert result[2] == traverse_graph
+        assert result[3] == build_visit_schedule
 
     def test_get_all_tools_no_duplicates(self):
         """Test that get_all_tools returns no duplicate tools."""

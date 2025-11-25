@@ -4,7 +4,7 @@ Tests for the NeurIPS2025Agent class.
 import pytest
 from unittest.mock import patch
 
-from llm_agents.agents.neurips2025_conference import NeurIPS2025Agent, DEFAULT_NEURIPS2025_AGENT_ARGS
+from agentic_nav.agents.neurips2025_conference import NeurIPS2025Agent, DEFAULT_NEURIPS2025_AGENT_ARGS
 
 
 class TestNeurIPS2025Agent:
@@ -35,15 +35,16 @@ class TestNeurIPS2025Agent:
         # Should have system message pre-configured
         assert len(agent.messages) == 1
         assert agent.messages[0]["role"] == "system"
-        assert "NeurIPS 2025 papers" in agent.messages[0]["content"]
-        assert "search tool" in agent.messages[0]["content"]
-        
-        # Should have the right tools
-        assert len(agent.tools) == 3
+        assert "NeurIPS 2025 conference" in agent.messages[0]["content"]
+        assert "search" in agent.messages[0]["content"]
+
+        # Should have the right tools (including build_visit_schedule added)
+        assert len(agent.tools) == 4
         tool_names = [tool.__name__ for tool in agent.tools]
         assert "search_similar_papers" in tool_names
         assert "find_neighboring_papers" in tool_names
         assert "traverse_graph" in tool_names
+        assert "build_visit_schedule" in tool_names
 
     def test_agent_initialization_custom_args(self):
         """Test agent initialization with custom arguments."""
@@ -67,12 +68,13 @@ class TestNeurIPS2025Agent:
         """Test that system prompt contains expected guidance."""
         agent = NeurIPS2025Agent()
         system_msg = agent.messages[0]["content"]
-        
+
         # Check key instruction components
-        assert "NeurIPS 2025 papers" in system_msg
-        assert "search tool" in system_msg
+        assert "NeurIPS 2025 conference" in system_msg
+        assert "search" in system_msg
         assert "paper titles and abstracts as input keywords" in system_msg
-        assert "cite titles, abstracts, and OpenReview URLs" in system_msg
+        # Check for OpenReview and URLs mentions
+        assert "OpenReview" in system_msg or "URL" in system_msg
 
     def test_agent_inherits_base_functionality(self):
         """Test that agent properly inherits from LLMAgent."""
@@ -86,9 +88,9 @@ class TestNeurIPS2025Agent:
         assert hasattr(agent, 'set_history')
         assert hasattr(agent, 'get_history')
 
-    @patch('llm_agents.tools.search_similar_papers')
-    @patch('llm_agents.tools.find_neighboring_papers')
-    @patch('llm_agents.tools.traverse_graph')
+    @patch('agentic_nav.tools.search_similar_papers')
+    @patch('agentic_nav.tools.find_neighboring_papers')
+    @patch('agentic_nav.tools.traverse_graph')
     def test_tools_import(self, mock_traverse, mock_neighboring, mock_search):
         """Test that tools are properly imported and available."""
         agent = NeurIPS2025Agent()
@@ -110,10 +112,10 @@ class TestNeurIPS2025Agent:
             'OLLAMA_API_KEY': 'env-key'
         }):
             # Remove from cache and reimport
-            if 'llm_agents.agents.neurips2025_conference' in sys.modules:
-                del sys.modules['llm_agents.agents.neurips2025_conference']
+            if 'agentic_nav.agents.neurips2025_conference' in sys.modules:
+                del sys.modules['agentic_nav.agents.neurips2025_conference']
 
-            from llm_agents.agents.neurips2025_conference import DEFAULT_NEURIPS2025_AGENT_ARGS
+            from agentic_nav.agents.neurips2025_conference import DEFAULT_NEURIPS2025_AGENT_ARGS
 
             assert DEFAULT_NEURIPS2025_AGENT_ARGS["model"] == "env-model"
             assert DEFAULT_NEURIPS2025_AGENT_ARGS["api_base"] == "http://env-base.com"

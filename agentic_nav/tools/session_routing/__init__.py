@@ -139,7 +139,7 @@ def build_visit_schedule(
     for topic in topics:
         try:
 
-            from llm_agents.tools.knowledge_graph.retriever import Neo4jGraphWorker
+            from agentic_nav.tools.knowledge_graph.retriever import Neo4jGraphWorker
 
             worker = Neo4jGraphWorker(
                 uri=NEO4J_DB_URI,
