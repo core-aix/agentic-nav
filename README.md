@@ -34,10 +34,10 @@ echo "NEO4J_PASSWORD=<a password of your choice>" >> .env
 echo "NEO4J_DB_URI=bolt://neo4j_db:7687" >> .env
 echo "NEO4J_DB_NODE_RETURN_LIMIT=200" >> .env
 
-echo "EMBEDDING_MODEL_NAME=nomic-embed-text" >> .env
+echo "EMBEDDING_MODEL_NAME=ollama/nomic-embed-text" >> .env
 echo "EMBEDDING_MODEL_API_BASE=http://ollama_agent:11434" >> .env
 
-echo "AGENT_MODEL_NAME=gpt-oss:20b" >> .env
+echo "AGENT_MODEL_NAME=ollama_chat/gpt-oss:20b" >> .env
 echo "AGENT_MODEL_API_BASE=http://ollama_agent:11434" >> .env
 
 # Optional: set your OLLAMA_API_KEY when using remote models

@@ -14,16 +14,15 @@ from typing import List
 LOGGER = logging.getLogger(__name__)
 local_embedding_model = None
 
+AVAILABLE_REMOTE_EMBEDDING_PROVIDERS_BASES = ["ollama_embed", "ollama.com", "localhost"]
+
 
 class EmbeddingResponse:
     def __init__(self, embeddings):
-        self.data = [
-            type('obj', (), {
-                'embedding': emb.tolist(),
-                'index': idx
-            })()
-            for idx, emb in enumerate(embeddings)
-        ]
+        self.data = [{
+            "embedding": emb.tolist(),
+            "index": idx
+        } for idx, emb in enumerate(embeddings)]
 
 
 def _get_local_model(embedding_model_name: str = "nomic-ai/nomic-embed-text-v1.5"):
@@ -71,10 +70,13 @@ def embed_hf_spaces(input, embedding_model_name: str = "nomic-ai/nomic-embed-tex
 def embedding_fn(model, input, api_base, **kwargs):
     if api_base == "hf_spaces_local":
         return embed_hf_spaces(input=input, embedding_model_name=model, api_base=api_base, **kwargs)
-    elif "localhost" in api_base or "ollama.com" in api_base:
+    elif any(provider in api_base for provider in AVAILABLE_REMOTE_EMBEDDING_PROVIDERS_BASES):
         return embedding(input=input, model=model, api_base=api_base, **kwargs)
     else:
-        raise NotImplementedError(f"Unknown api_base for provider {api_base}. Available options: hf_spaces_local, ollama local (http://localhost:11435), ollama cloud (https://ollama.com)")
+        raise NotImplementedError(
+            f"Unknown api_base for provider {api_base}. "
+            f"Supported providers: {AVAILABLE_REMOTE_EMBEDDING_PROVIDERS_BASES + ['hf_spaces_local']}"
+        )
 
 
 def batch_embed_documents(

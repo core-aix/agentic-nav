@@ -20,7 +20,7 @@ from agentic_nav.utils.embedding_generator import batch_embed_documents
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 LOGGER = logging.getLogger(__name__)
-EMBEDDING_MODEL_NAME = os.environ.get("EMBEDDING_MODEL_NAME", "nomic-embed-text")
+EMBEDDING_MODEL_NAME = os.environ.get("EMBEDDING_MODEL_NAME", "ollama/nomic-embed-text")
 EMBEDDING_MODEL_API_BASE = os.environ.get("EMBEDDING_MODEL_API_BASE", "http://localhost:11435")
 NEO4J_DB_URI = os.environ.get("NEO4J_DB_URI", "bolt://neo4j_db:7687")
 NEO4J_DB_NODE_RETURN_LIMIT = int(os.environ.get("NEO4J_DB_NODE_RETURN_LIMIT", 200))
@@ -208,7 +208,7 @@ class Neo4jGraphWorker:
     @staticmethod
     def embed_user_query(
         text: str,
-        embedding_model: str = f"ollama/{EMBEDDING_MODEL_NAME}",
+        embedding_model: str = EMBEDDING_MODEL_NAME,
         api_base: str = EMBEDDING_MODEL_API_BASE
     ):
         emb = batch_embed_documents(
@@ -304,6 +304,8 @@ class Neo4jGraphWorker:
 
                 # Apply minimum similarity filter if specified
                 if min_similarity is None or paper['similarity_score'] >= min_similarity:
+                    # IMPORTANT: We don't return the similarity as the model has high affinity to scores like that...
+                    del paper["similarity_score"]
                     papers.append(paper)
 
             return papers
@@ -345,10 +347,16 @@ class Neo4jGraphWorker:
             neighbors = {}
 
             for record in result:
+                # Use the dict() object in Record to manipulate the data. Records are immutable.
+                record = record.data()
                 rel_type = record["relationship_type"]
                 if rel_type not in neighbors.keys():
                     neighbors[rel_type] = []
                 else:
+                    if "similarity" in record.keys():
+                        # IMPORTANT: We don't return the similarity as the model has high affinity to scores like that...
+                        del record["similarity"]
+
                     neighbors[rel_type].append(record)
 
             return neighbors
@@ -567,9 +575,9 @@ class Neo4jGraphWorker:
 if __name__ == "__main__":
     # Initialize searcher
     searcher = Neo4jGraphWorker(
-        uri="bolt://localhost:7687",
-        username="neo4j",
-        password="llm_agents"
+        uri=NEO4J_DB_URI,
+        username=os.environ.get("NEO4J_USERNAME", "neo4j"),
+        password=os.environ.get("NEO4J_PASSWORD")
     )
 
     try:
@@ -582,7 +590,7 @@ if __name__ == "__main__":
         for i, paper in enumerate(similar_papers, 1):
             print(f"\n{i}. {paper['name']}")
             print(f"   Topic: {paper['topic']}")
-            print(f"   Similarity: {paper['similarity_score']:.4f}")
+            # print(f"   Similarity: {paper['similarity_score']:.4f}")
 
         # Example 2: Neighborhood search
         if similar_papers:
@@ -595,7 +603,7 @@ if __name__ == "__main__":
             for rel_type, neighbors in neighbors.items():
                 print(f"    \n{rel_type.upper()} RELATIONSHIPS:")
                 for neighbor in neighbors:
-                    print(f"      - {neighbor['name']} (similarity: {neighbor['similarity']:.4f})")
+                    print(f"      - {neighbor['name']}")  # (similarity: {neighbor['similarity']:.4f})
 
         # Example 3: Graph traversal
         print("\n" + "=" * 60)

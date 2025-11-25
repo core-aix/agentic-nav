@@ -37,7 +37,7 @@ services:
       retries: 10
       start_period: 30s
     networks:
-      - llm_agents_net
+      - agentic_nav_net
 
   ollama_embed:
     image: ollama/ollama:latest
@@ -55,10 +55,10 @@ services:
     entrypoint: [ "/bin/bash", "-c", "\
             ollama serve & \
             sleep 5 && \
-            ollama pull $EMBEDDING_MODEL_NAME && \
+            ollama pull $${EMBEDDING_MODEL_NAME#ollama/} && \
             wait" ]
     networks:
-      - llm_agents_net
+      - agentic_nav_net
     deploy:
       resources:
         reservations:
@@ -83,10 +83,10 @@ services:
     entrypoint: [ "/bin/bash", "-c", "\
         ollama serve & \
         sleep 5 && \
-        ollama pull $AGENT_MODEL_NAME && \
+        ollama pull $${AGENT_MODEL_NAME#ollama_chat/} && \
         wait" ]
     networks:
-      - llm_agents_net
+      - agentic_nav_net
     deploy:
       resources:
         reservations:
@@ -113,10 +113,10 @@ services:
       - EMBEDDING_MODEL_API_BASE=http://ollama_embed:11434
       - AGENT_MODEL_NAME=${AGENT_MODEL_NAME}
       - AGENT_MODEL_API_BASE=http://ollama_agent:11434
-      - NEO4J_DB_NODE_RETURN_LIMIT = ${NEO4J_DB_NODE_RETURN_LIMIT}
+      - NEO4J_DB_NODE_RETURN_LIMIT=${NEO4J_DB_NODE_RETURN_LIMIT}
     restart: unless-stopped
     networks:
-      - llm_agents_net
+      - agentic_nav_net
     depends_on:
       neo4j_db:
         condition: service_healthy
@@ -127,7 +127,7 @@ services:
 
 
 networks:
-  llm_agents_net:
+  agentic_nav_net:
 
 
 volumes:

@@ -10,8 +10,6 @@ Features matching terminal UI:
 - Clear chat functionality
 - **Per-user conversation state management with stateless agent**
 """
-from venv import logger
-
 import gradio as gr
 import os
 import datetime
@@ -28,10 +26,10 @@ from agentic_nav.utils.file_handlers import save_chat_history
 
 LOGGER = logging.getLogger(__name__)
 
-EMBEDDING_MODEL_NAME = os.environ.get("EMBEDDING_MODEL_NAME", "nomic-embed-text")
+EMBEDDING_MODEL_NAME = os.environ.get("EMBEDDING_MODEL_NAME", "ollama/nomic-embed-text")
 EMBEDDING_MODEL_API_BASE = os.environ.get("EMBEDDING_MODEL_API_BASE", "http://localhost:11435")
 
-AGENT_MODEL_NAME = os.environ.get("AGENT_MODEL_NAME", "gpt-oss:20b")
+AGENT_MODEL_NAME = os.environ.get("AGENT_MODEL_NAME", "ollama_chat/gpt-oss:20b")
 AGENT_MODEL_API_BASE = os.environ.get("AGENT_MODEL_API_BASE", "http://localhost:11436")
 OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY", DEFAULT_NEURIPS2025_AGENT_ARGS["api_key"])
 
@@ -78,7 +76,7 @@ def configure_agent(
         del current_config_to_print["api_key"]
     LOGGER.info(f"User-defined configuration saved. Config: {current_config_to_print}")
 
-    return current_config, "✓ Agent initialized successfully!"
+    return current_config, "✓ Agent configuration updated successfully!"
 
 
 def chat_fn(
@@ -297,9 +295,23 @@ def main():
     with gr.Blocks(
         title="AgenticNAV",
         theme=gr.themes.Default(
-        spacing_size=gr.themes.sizes.spacing_sm,
-        radius_size=gr.themes.sizes.radius_none
-    )) as webapp:
+            spacing_size=gr.themes.sizes.spacing_sm,
+            font=[gr.themes.GoogleFont("Inconsolata"), "Arial", "sans-serif"],
+            radius_size=gr.themes.sizes.radius_sm,
+            primary_hue=gr.themes.colors.slate,
+            secondary_hue=gr.themes.colors.blue
+        ),
+            css="""
+            #submit_textbox button {
+                background-color: #ff6b6b !important;
+                border-color: #ff6b6b !important;
+            }
+            #submit_textbox button:hover {
+                background-color: #ee5a52 !important;
+                border-color: #ee5a52 !important;
+            }
+            """
+    ) as webapp:
 
         gr.Markdown(
             "# 🤖 AgenticNAV - Explore NeurIPS 2025 papers and build your personalized schedule, effortlessly!\n "
@@ -329,66 +341,70 @@ def main():
                         label="Your message",
                         placeholder="Type your message here...",
                         lines=3,
-                        scale=4
+                        scale=4,
+                        show_label=False,
+                        interactive=True,
+                        submit_btn=True,
+                        autofocus=True,
+                        elem_id="submit_textbox"
                     )
-                    submit_btn = gr.Button("Send", variant="primary", scale=1)
+                    # submit_btn = gr.Button("Send", variant="primary", scale=1)
 
                 with gr.Row():
                     clear_btn = gr.Button("🗑️ Clear Chat", size="sm")
                     save_btn = gr.Button("💾 Save History", size="sm")
 
-                with gr.Row():
-                    # Help text at bottom
-                    gr.Markdown("""
-                        ### 📖 Usage Guide
-
-                        1. **Initialize**: Configure settings and click "Initialize Agent"
-                        2. **Chat**: Type messages and press Enter or click Send
-                        3. **System Prompt**: Customize the agent's behavior via System Prompt panel
-                        4. **History**: View or save your conversation using the History & Save panel
-                        5. **Clear**: Start a fresh conversation with the Clear Chat button
-
-                        ### Note on Ollama API Keys
-                        In case you are experiencing an error calling the agent model (usually indicated by a message 
-                        containing the word "unauthorized"), you may go to https://ollama.com and generate your own key. 
-                        You can provide it in the configuration below. It will not be stored on our system and gets deleted 
-                        when you end session (i.e., close your browser window).
-
-                        **Note**: Each browser session maintains its own independent conversation state.
-                        Uses stateless agent interaction for better concurrency support.
-                        """
-                    )
-
         with gr.Row():
-            with gr.Column():
+            with gr.Column(scale=1):
+                # Help text at bottom
+                gr.Markdown("""
+                    ### 📖 Usage Guide
+    
+                    1. **Initialize**: Configure settings and click "Initialize Agent"
+                    2. **Chat**: Type messages and press Enter or click Send
+                    3. **System Prompt**: Customize the agent's behavior via System Prompt panel
+                    4. **History**: View or save your conversation using the History & Save panel
+                    5. **Clear**: Start a fresh conversation with the Clear Chat button
+    
+                    ### Note on Ollama API Keys
+                    In case you are experiencing an error calling the agent model (usually indicated by a message 
+                    containing the word "unauthorized"), you may go to https://ollama.com and generate your own key. 
+                    You can provide it in the Agent Settings. It will not be stored on our system and gets deleted 
+                    when you end your session (i.e., close your browser window).
+    
+                    **Note**: Each browser session maintains its own independent conversation state that will be deleted as you close the browser window. It will never be stored on our server.
+                    """
+                )
+
+            with gr.Column(scale=2):
                 # Settings panel
                 gr.Markdown("### ⚙️ Agent Settings")
 
-                with gr.Accordion("Configuration", open=True):
+                with gr.Accordion("Configuration", open=False):
                     api_base_input = gr.Textbox(
-                        label="API Base URL",
+                        label="API Base URL (leave empty when using OpenAI, Anthropic, etc.)",
                         value=AGENT_MODEL_API_BASE,
                         placeholder="http://localhost:11434"
                     )
 
                     api_key_input = gr.Textbox(
-                        label="API Key (only needed for remote models)",
+                        label="API Key",
                         value="",
                         type="password",
-                        placeholder="Leave empty if not needed"
+                        placeholder="Please provide one if our quote is exceeded."
                     )
 
                     model_input = gr.Textbox(
                         label="Model",
-                        value=f"ollama_chat/{AGENT_MODEL_NAME}" if "ollama_chat" not in AGENT_MODEL_NAME else AGENT_MODEL_NAME,
-                        placeholder="ollama_chat/gpt-oss:20b"
+                        value=AGENT_MODEL_NAME,
+                        placeholder="ollama_chat/gpt-oss:120b-cloud"
                     )
 
                     temperature_input = gr.Slider(
                         label="Temperature",
                         minimum=0.0,
                         maximum=1.0,
-                        value=0.2,
+                        value=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["temperature"],
                         step=0.1
                     )
 
@@ -396,14 +412,16 @@ def main():
                         label="Max Tokens",
                         minimum=100,
                         maximum=8192,
-                        value=6000,
+                        value=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["max_tokens"],
                         step=10
                     )
 
-                    num_ctx_input = gr.Number(
-                        label="Context Window",
-                        value=131072,
-                        precision=0
+                    num_ctx_input = gr.Slider(
+                        label="Context Window (may not have an effect on some models and providers)",
+                        minimum=1024,
+                        maximum=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["num_ctx"],
+                        value=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["num_ctx"],
+                        step=128
                     )
 
                     max_papers_input = gr.Slider(
@@ -429,6 +447,7 @@ def main():
 
                 with gr.Accordion("History & Save", open=False):
                     view_history_btn = gr.Button("📜 View Full History")
+                    gr.Markdown(f"**Note:** This will save the conversation to our server, not on your local machine. If you'd like to download the conversation, use the download button (top right) in the conversation trail.")
                     history_output = gr.Code(
                         label="Conversation History (JSON)",
                         language="json",
@@ -456,17 +475,6 @@ def main():
                 config_state
             ],
             outputs=[config_state, init_status]
-        )
-
-        # Chat submission
-        submit_btn.click(
-            fn=lambda msg_input, chatbot, config_state, messages_state: (yield from submit_message(msg_input, chatbot, config_state, messages_state, agent)),
-            inputs=[msg_input, chatbot, config_state, messages_state],
-            outputs=[chatbot, messages_state]
-        ).then(
-            fn=lambda: "",
-            inputs=None,
-            outputs=msg_input
         )
 
         msg_input.submit(
