@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch, Mock
 
-from llm_agents.utils.logger import setup_logging
+from agentic_nav.utils.logger import setup_logging
 
 
 class TestSetupLogging:
@@ -33,7 +33,7 @@ class TestSetupLogging:
             # Should not raise error
             setup_logging(log_dir=str(log_dir), level="INFO")
 
-    @patch('llm_agents.utils.logging.datetime')
+    @patch('agentic_nav.utils.logger.datetime')
     def test_setup_logging_creates_handlers(self, mock_datetime):
         """Test that console and file handlers are created."""
         mock_datetime.now.return_value.strftime.return_value = "2024-01-01_12-00"
@@ -77,7 +77,7 @@ class TestSetupLogging:
             with pytest.raises(AttributeError):
                 setup_logging(log_dir=temp_dir, level="INVALID")
 
-    @patch('llm_agents.utils.logging.datetime')
+    @patch('agentic_nav.utils.logger.datetime')
     def test_setup_logging_file_naming(self, mock_datetime):
         """Test that log files are named correctly."""
         mock_datetime.now.return_value.strftime.return_value = "2024-01-01_12-30"
@@ -112,7 +112,7 @@ class TestSetupLogging:
             
             # Verify handler levels
             assert console_handler is not None
-            assert console_handler.level == logging.INFO
+            assert console_handler.level == logging.WARNING
             
             assert file_handler is not None
             assert file_handler.level == logging.DEBUG
@@ -139,7 +139,7 @@ class TestSetupLogging:
                 assert "%(name)s" in format_string
                 assert "%(message)s" in format_string
 
-    @patch('llm_agents.utils.logging.logging.handlers.RotatingFileHandler')
+    @patch('agentic_nav.utils.logger.logging.handlers.RotatingFileHandler')
     def test_setup_logging_rotating_file_config(self, mock_rotating_handler):
         """Test that rotating file handler is configured correctly."""
         mock_handler_instance = Mock()

@@ -314,180 +314,185 @@ def main():
             #submit_textbox button:hover {
                 background-color: #ee5a52 !important;
                 border-color: #ee5a52 !important;
-            }
-            
-            .scrollable-div {
-                display: flex;
-                overflow-x: auto;
-                min-width: 200px;
-            }
-            
+            }            
             """
     ) as webapp:
 
         gr.Markdown("""
-        # 🤖 AgenticNAV - Explore NeurIPS 2025 papers and build your personalized schedule, effortlessly!
-        
+        # 🤖 AgenticNAV - Planning your NeurIPS 2025 visit made effortless
         This agent can help you explore the more than 5000 papers at this year's NeurIPS conference. 
-        You can start chatting right away but see below for more specific instructions on how to use the agent with your 
-        favorite model and inference config. You can also set a custom system prompt.
-        
-        **Note:** This is an experimental deployment and LLMs can make mistakes. This can mean that the agent may not 
-        discover your paper even though it is presented at the conference. Also, note that the ordering of authors may 
-        not be correct. Check the paper links for more details.
-        
+        You can start chatting right away but we also offer options for customization (see tab "Guide & Settings").
         """)
 
         # Session state for agent instance, config, and messages
         config_state = gr.State(value=DEFAULT_NEURIPS2025_AGENT_ARGS)
         messages_state = gr.State(value=[agent.get_system_prompt(), AGENT_INTRODUCTION_PROMPT])
 
-        with gr.Row():
-            with gr.Column():
-                # Main chat interface
-                chatbot = gr.Chatbot(
-                    value=messages_state.value,
-                    label="Conversation",
-                    height=750,
-                    type="messages",
-                    show_copy_button=True,
-                    sanitize_html=True
-                )
+        with gr.Tabs():
+            with gr.Tab("💬 Chat"):
+                with gr.Row():
+                    with gr.Column():
+                        gr.Markdown("""
+                        <sub><sup>**Note:** This is an experimental deployment and LLMs can make mistakes. This can mean that the agent may not 
+                        discover your paper even though it is presented at the conference. Also, note that the ordering of authors may 
+                        not be correct. Check the paper links for more details.<sub><sup>
+                        """)
+
+                        # Main chat interface
+                        chatbot = gr.Chatbot(
+                            value=messages_state.value,
+                            label="Conversation",
+                            height=500,
+                            type="messages",
+                            show_copy_button=True,
+                            sanitize_html=True
+                        )
+
+                        with gr.Row():
+                            msg_input = gr.Textbox(
+                                label="Your message",
+                                placeholder="Type your message here...",
+                                # lines=1,
+                                scale=4,
+                                show_label=False,
+                                interactive=True,
+                                submit_btn=True,
+                                autofocus=True,
+                                elem_id="submit_textbox",
+                                # stop_btn=True TODO: Allow users to stop the conversation!
+                            )
+                            # submit_btn = gr.Button("Send", variant="primary", scale=1)
+
+                        with gr.Row():
+                            clear_btn = gr.Button("🗑️ Clear Chat", size="sm")
+                            # save_btn = gr.Button("💾 Save History", size="sm")
 
                 with gr.Row():
-                    msg_input = gr.Textbox(
-                        label="Your message",
-                        placeholder="Type your message here...",
-                        # lines=1,
-                        scale=4,
-                        show_label=False,
-                        interactive=True,
-                        submit_btn=True,
-                        autofocus=True,
-                        elem_id="submit_textbox",
-                        # stop_btn=True TODO: Allow users to stop the conversation!
-                    )
-                    # submit_btn = gr.Button("Send", variant="primary", scale=1)
+                    with gr.Column():
+                        gr.Markdown("""
+                        
+                        **Code & Feedback:** The implementation details of AgenticNAV can be found on GitHub: https://github.com/core-aix/agentic-nav.
+                        Please leave any feedback in the [Community Tab](https://huggingface.co/spaces/CORE-AIx/AgenticNav/discussions). 
+                        We look forward to your thoughts and suggestions! Also, you are more than welcome to contribute new skills and tools to the agent.
+                        
+                        """)
 
+            with gr.Tab("⚙️ Guide & Settings"):
                 with gr.Row():
-                    clear_btn = gr.Button("🗑️ Clear Chat", size="sm")
-                    # save_btn = gr.Button("💾 Save History", size="sm")
+                    with gr.Column(scale=1):
+                        gr.Markdown("""
+                            ### 📖 Usage Guide
+                            
+                            **You can start chatting with AgenticNAV right away.** 
+                            Note that we provide a default key for Ollama that may reach its quota quickly (depending on demand). 
+                            If you see that the agent cannot respond, please provide your own Ollama API key (see below for details). 
+                            
+                            #### Updating the client config 
+                            1. Open the "Configuration" tab in the Settings column
+                            2. Add your API key and make any other changes you'd like
+                            3. Click "Update Config" to save the changes
+                            
+                            #### Setting a custom system prompt
+                            You can set a custom system prompt to customize the behavior of the agent in the "System Prompt" tab
+                            
+                            #### Viewing the complete history
+                            Open the "History & Save" tab to see the full details on your conversation and what gets passed between 
+                            user and agent.
+            
+                            ### _Note on Ollama API Keys_
+                            In case you are experiencing an error calling the agent model (usually indicated by a message 
+                            containing the word "unauthorized"), you may go to https://ollama.com and generate your own key. 
+                            You can provide it in the Agent Settings. It will not be stored on our system and gets deleted 
+                            when you end your session (i.e., close your browser window).
+            
+                            **Note**: Each browser session maintains its own independent conversation state that will be deleted as you close the browser window. It will never be stored on our server.
+                            """
+                        )
 
-        with gr.Row():
-            with gr.Column(scale=1):
-                gr.Markdown("""
-                    ### 📖 Usage Guide
-                    
-                    **You can start chatting with AgenticNAV right away.** 
-                    Note that we provide a default key for Ollama that may reach its quota quickly (depending on demand). 
-                    If you see that the agent cannot respond, please provide your own Ollama API key (see below for details). 
-                    
-                    #### Updating the client config 
-                    1. Open the "Configuration" tab in the Settings column
-                    2. Add your API key and make any other changes you'd like
-                    3. Click "Update Config" to save the changes
-                    
-                    #### Setting a custom system prompt
-                    You can set a custom system prompt to customize the behavior of the agent in the "System Prompt" tab
-                    
-                    #### Viewing the complete history
-                    Open the "History & Save" tab to see the full details on your conversation and what gets passed between 
-                    user and agent.
-    
-                    ### _Note on Ollama API Keys_
-                    In case you are experiencing an error calling the agent model (usually indicated by a message 
-                    containing the word "unauthorized"), you may go to https://ollama.com and generate your own key. 
-                    You can provide it in the Agent Settings. It will not be stored on our system and gets deleted 
-                    when you end your session (i.e., close your browser window).
-    
-                    **Note**: Each browser session maintains its own independent conversation state that will be deleted as you close the browser window. It will never be stored on our server.
-                    """
-                )
+                    with gr.Column(scale=2):
+                        # Settings panel
+                        gr.Markdown("### ⚙️ Agent Settings")
 
-            with gr.Column(scale=2):
-                # Settings panel
-                gr.Markdown("### ⚙️ Agent Settings")
+                        with gr.Accordion("Configuration", open=False):
+                            api_base_input = gr.Textbox(
+                                label="API Base URL (leave empty when using OpenAI, Anthropic, etc.)",
+                                value=AGENT_MODEL_API_BASE,
+                                placeholder="http://localhost:11434"
+                            )
 
-                with gr.Accordion("Configuration", open=False):
-                    api_base_input = gr.Textbox(
-                        label="API Base URL (leave empty when using OpenAI, Anthropic, etc.)",
-                        value=AGENT_MODEL_API_BASE,
-                        placeholder="http://localhost:11434"
-                    )
+                            api_key_input = gr.Textbox(
+                                label="API Key",
+                                value="",
+                                type="password",
+                                placeholder="Please provide one if our quote is exceeded."
+                            )
 
-                    api_key_input = gr.Textbox(
-                        label="API Key",
-                        value="",
-                        type="password",
-                        placeholder="Please provide one if our quote is exceeded."
-                    )
+                            model_input = gr.Textbox(
+                                label="Model",
+                                value=AGENT_MODEL_NAME,
+                                placeholder="ollama_chat/gpt-oss:120b-cloud"
+                            )
 
-                    model_input = gr.Textbox(
-                        label="Model",
-                        value=AGENT_MODEL_NAME,
-                        placeholder="ollama_chat/gpt-oss:120b-cloud"
-                    )
+                            temperature_input = gr.Slider(
+                                label="Temperature",
+                                minimum=0.0,
+                                maximum=1.0,
+                                value=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["temperature"],
+                                step=0.1
+                            )
 
-                    temperature_input = gr.Slider(
-                        label="Temperature",
-                        minimum=0.0,
-                        maximum=1.0,
-                        value=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["temperature"],
-                        step=0.1
-                    )
+                            max_tokens_input = gr.Slider(
+                                label="Max Tokens",
+                                minimum=100,
+                                maximum=32768,
+                                value=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["max_tokens"],
+                                step=10
+                            )
 
-                    max_tokens_input = gr.Slider(
-                        label="Max Tokens",
-                        minimum=100,
-                        maximum=32768,
-                        value=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["max_tokens"],
-                        step=10
-                    )
+                            num_ctx_input = gr.Slider(
+                                label="Context Window (may not have an effect on some models and providers)",
+                                minimum=1024,
+                                maximum=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["num_ctx"],
+                                value=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["num_ctx"],
+                                step=128
+                            )
 
-                    num_ctx_input = gr.Slider(
-                        label="Context Window (may not have an effect on some models and providers)",
-                        minimum=1024,
-                        maximum=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["num_ctx"],
-                        value=DEFAULT_NEURIPS2025_AGENT_ARGS["llm_args"]["num_ctx"],
-                        step=128
-                    )
+                            max_papers_input = gr.Slider(
+                                label="Max Papers to Retrieve",
+                                minimum=0,
+                                maximum=100,
+                                value=50,
+                                step=1
+                            )
 
-                    max_papers_input = gr.Slider(
-                        label="Max Papers to Retrieve",
-                        minimum=0,
-                        maximum=100,
-                        value=50,
-                        step=1
-                    )
+                            init_btn = gr.Button("Update Config", variant="primary")
+                            init_status = gr.Textbox(label="Status", interactive=False)
 
-                    init_btn = gr.Button("Update Config", variant="primary")
-                    init_status = gr.Textbox(label="Status", interactive=False)
+                        with gr.Accordion("System Prompt", open=False):
+                            system_prompt_input = gr.Textbox(
+                                label="System Prompt",
+                                value=agent.get_system_prompt()["content"] if type(agent.get_system_prompt()) is dict else None,
+                                placeholder="Enter custom system prompt here...",
+                                lines=12
+                            )
+                            update_system_btn = gr.Button("Update System Prompt")
+                            system_status = gr.Textbox(label="Status", interactive=False)
 
-                with gr.Accordion("System Prompt", open=False):
-                    system_prompt_input = gr.Textbox(
-                        label="System Prompt",
-                        value=agent.get_system_prompt()["content"] if type(agent.get_system_prompt()) is dict else None,
-                        placeholder="Enter custom system prompt here...",
-                        lines=12
-                    )
-                    update_system_btn = gr.Button("Update System Prompt")
-                    system_status = gr.Textbox(label="Status", interactive=False)
+                        with gr.Accordion("History & Save", open=False):
+                            view_history_btn = gr.Button("📜 View Full History")
+                            gr.Markdown(f"**Note:** If you'd like to download the conversation, use the download button below (upper right corner).")
+                            history_output = gr.Code(
+                                label="Conversation History (JSON)",
+                                language="json",
+                                lines=10
+                            )
 
-                with gr.Accordion("History & Save", open=False):
-                    view_history_btn = gr.Button("📜 View Full History")
-                    gr.Markdown(f"**Note:** If you'd like to download the conversation, use the download button below (upper right corner).")
-                    history_output = gr.Code(
-                        label="Conversation History (JSON)",
-                        language="json",
-                        lines=10
-                    )
-
-                    # save_filename_input = gr.Textbox(
-                    #     label="Filename (optional)",
-                    #     placeholder="Leave empty for auto-generated name",
-                    #    value=""
-                    # )
-                    # save_status = gr.Textbox(label="Save Status", interactive=False)
+                            # save_filename_input = gr.Textbox(
+                            #     label="Filename (optional)",
+                            #     placeholder="Leave empty for auto-generated name",
+                            #    value=""
+                            # )
+                            # save_status = gr.Textbox(label="Save Status", interactive=False)
 
         # Event handlers
         init_btn.click(

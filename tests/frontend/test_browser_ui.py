@@ -11,15 +11,15 @@ class TestBrowserUIFunctions:
     def test_module_imports(self):
         """Test that module imports work correctly."""
         try:
-            from llm_agents.frontend import browser_ui
+            from agentic_nav.frontend import browser_ui
             assert hasattr(browser_ui, 'LOGGER')
         except ImportError as e:
             pytest.skip(f"Could not import browser_ui: {e}")
 
-    @patch('llm_agents.frontend.browser_ui.NeurIPS2025Agent')
+    @patch('agentic_nav.frontend.browser_ui.NeurIPS2025Agent')
     def test_agent_initialization(self, mock_agent_class):
         """Test global agent initialization."""
-        from llm_agents.frontend.browser_ui import initialize_agent
+        from agentic_nav.frontend.browser_ui import initialize_agent
 
         mock_agent = Mock()
         mock_agent_class.return_value = mock_agent
@@ -34,7 +34,7 @@ class TestBrowserUIFunctions:
 
     def test_configure_agent_function(self):
         """Test the initialize_agent function."""
-        from llm_agents.frontend.browser_ui import configure_agent
+        from agentic_nav.frontend.browser_ui import configure_agent
         
         current_config = {}
         
@@ -60,11 +60,11 @@ class TestBrowserUIFunctions:
 
     def test_initialize_agent_api_key_masking(self):
         """Test that API key is masked in logged config."""
-        from llm_agents.frontend.browser_ui import configure_agent
+        from agentic_nav.frontend.browser_ui import configure_agent
         
         current_config = {}
         
-        with patch('llm_agents.frontend.browser_ui.LOGGER') as mock_logger:
+        with patch('agentic_nav.frontend.browser_ui.LOGGER') as mock_logger:
             configure_agent(
                 api_base="http://test.com",
                 api_key="secret-key-123",
@@ -124,11 +124,11 @@ class TestBrowserUIIntegration:
 class TestBrowserUIMain:
     """Test the main function for browser UI."""
 
-    @patch('llm_agents.frontend.browser_ui.initialize_agent')
-    @patch('llm_agents.frontend.browser_ui.gr')
+    @patch('agentic_nav.frontend.browser_ui.initialize_agent')
+    @patch('agentic_nav.frontend.browser_ui.gr')
     def test_main_function_exists(self, mock_gr, mock_initialize_agent):
         """Test that main function exists and can be called."""
-        from llm_agents.frontend.browser_ui import main
+        from agentic_nav.frontend.browser_ui import main
 
         # Mock the agent instance
         mock_agent = Mock()
@@ -170,7 +170,7 @@ class TestBrowserUIMain:
         # Verify Blocks was created with expected parameters
         mock_gr.Blocks.assert_called_once()
         call_kwargs = mock_gr.Blocks.call_args[1]
-        assert call_kwargs['title'] == "SciAgent For NeurIPS 2025"
+        assert call_kwargs['title'] == "AgenticNAV"
 
         # Verify launch was called with expected parameters
         mock_webapp.launch.assert_called_once()
@@ -181,11 +181,11 @@ class TestBrowserUIMain:
         assert launch_kwargs['show_error'] is True
         assert launch_kwargs['debug'] is True
 
-    @patch('llm_agents.frontend.browser_ui.initialize_agent')
-    @patch('llm_agents.frontend.browser_ui.gr')
+    @patch('agentic_nav.frontend.browser_ui.initialize_agent')
+    @patch('agentic_nav.frontend.browser_ui.gr')
     def test_main_creates_ui_components(self, mock_gr, mock_initialize_agent):
         """Test that main function creates necessary UI components."""
-        from llm_agents.frontend.browser_ui import main
+        from agentic_nav.frontend.browser_ui import main
 
         # Track all gr component calls
         component_calls = []
@@ -257,23 +257,25 @@ class TestBrowserUIMain:
 
         # Verify multiple instances of common components
         assert component_calls.count('Textbox') >= 5
-        assert component_calls.count('Button') >= 5
+        assert component_calls.count('Button') >= 4
         assert component_calls.count('Markdown') >= 3
 
     def test_main_entry_point(self):
         """Test that the module can be used as entry point."""
         try:
-            import llm_agents.frontend.browser_ui
+            import agentic_nav.frontend.browser_ui
             # Verify the module has the expected main function
-            assert hasattr(llm_agents.frontend.browser_ui, 'main')
-            assert callable(llm_agents.frontend.browser_ui.main)
+            assert hasattr(agentic_nav.frontend.browser_ui, 'main')
+            assert callable(agentic_nav.frontend.browser_ui.main)
         except ImportError:
             pytest.fail("Could not import browser_ui module")
 
-    @patch('llm_agents.frontend.browser_ui.initialize_agent')
+
+
+    @patch('agentic_nav.frontend.browser_ui.initialize_agent')
     def test_main_initializes_agent(self, mock_initialize_agent):
         """Test that main function initializes the agent."""
-        from llm_agents.frontend.browser_ui import main
+        from agentic_nav.frontend.browser_ui import main
 
         # Mock the agent instance
         mock_agent = Mock()

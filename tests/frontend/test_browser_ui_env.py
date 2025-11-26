@@ -13,15 +13,15 @@ def test_environment_variable_usage_isolated(monkeypatch):
     
     # Clear only the specific browser_ui module to force fresh import
     # Don't clear parent packages to avoid breaking the import structure
-    if 'llm_agents.frontend.browser_ui' in sys.modules:
-        del sys.modules['llm_agents.frontend.browser_ui']
+    if 'agentic_nav.frontend.browser_ui' in sys.modules:
+        del sys.modules['agentic_nav.frontend.browser_ui']
 
     monkeypatch.setenv('EMBEDDING_MODEL_NAME', 'test-embed-model')
     monkeypatch.setenv('EMBEDDING_MODEL_API_BASE', 'http://test-embed.com')
     monkeypatch.setenv('AGENT_MODEL_API_BASE', 'http://test-agent.com')
     monkeypatch.setenv('OLLAMA_API_KEY', 'test-key')
 
-    import llm_agents.frontend.browser_ui as browser_ui
+    import agentic_nav.frontend.browser_ui as browser_ui
     
     # Verify these are NOT mocks
     assert not isinstance(browser_ui.EMBEDDING_MODEL_NAME, MagicMock), f"EMBEDDING_MODEL_NAME is a mock: {type(browser_ui.EMBEDDING_MODEL_NAME)}"

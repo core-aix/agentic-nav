@@ -7,7 +7,7 @@ from unittest.mock import patch, Mock, MagicMock, AsyncMock
 from pathlib import Path
 
 # Import the module under test
-from llm_agents.frontend.cli import (
+from agentic_nav.frontend.cli import (
     create_prompt_session,
     render_markdown,
     stream_agent_response_sync,
@@ -20,8 +20,8 @@ from llm_agents.frontend.cli import (
 class TestCreatePromptSession:
     """Test the create_prompt_session function."""
 
-    @patch('llm_agents.frontend.cli.PromptSession')
-    @patch('llm_agents.frontend.cli.FileHistory')
+    @patch('agentic_nav.frontend.cli.PromptSession')
+    @patch('agentic_nav.frontend.cli.FileHistory')
     def test_create_prompt_session_basic(self, mock_file_history, mock_prompt_session):
         """Test basic prompt session creation."""
         mock_session_instance = Mock()
@@ -50,7 +50,7 @@ class TestCreatePromptSession:
 class TestRenderMarkdown:
     """Test the render_markdown function."""
 
-    @patch('llm_agents.frontend.cli.console')
+    @patch('agentic_nav.frontend.cli.console')
     def test_render_markdown_without_title(self, mock_console):
         """Test markdown rendering without title."""
         render_markdown("# Test Markdown")
@@ -60,8 +60,8 @@ class TestRenderMarkdown:
         call_args = mock_console.print.call_args[0][0]
         assert hasattr(call_args, 'markup')  # Markdown object
 
-    @patch('llm_agents.frontend.cli.console')
-    @patch('llm_agents.frontend.cli.Panel')
+    @patch('agentic_nav.frontend.cli.console')
+    @patch('agentic_nav.frontend.cli.Panel')
     def test_render_markdown_with_title(self, mock_panel, mock_console):
         """Test markdown rendering with title."""
         mock_panel_instance = Mock()
@@ -103,7 +103,7 @@ class TestStreamAgentResponse:
         mock_agent.interact_stateless.return_value = iter(message_updates)
         
         # Mock Live context manager
-        with patch('llm_agents.frontend.cli.Live') as mock_live:
+        with patch('agentic_nav.frontend.cli.Live') as mock_live:
             mock_live_instance = Mock()
             mock_live.return_value.__enter__.return_value = mock_live_instance
             
@@ -124,7 +124,7 @@ class TestStreamAgentResponse:
         # Mock interact_stateless to raise KeyboardInterrupt
         mock_agent.interact_stateless.side_effect = KeyboardInterrupt()
         
-        with patch('llm_agents.frontend.cli.Live') as mock_live:
+        with patch('agentic_nav.frontend.cli.Live') as mock_live:
             mock_live_instance = Mock()
             mock_live.return_value.__enter__.return_value = mock_live_instance
             
@@ -151,7 +151,7 @@ class TestStreamAgentResponse:
         ]
         mock_agent.interact_stateless.return_value = iter(message_updates)
         
-        with patch('llm_agents.frontend.cli.Live') as mock_live:
+        with patch('agentic_nav.frontend.cli.Live') as mock_live:
             mock_live_instance = Mock()
             mock_live.return_value.__enter__.return_value = mock_live_instance
             
@@ -171,7 +171,7 @@ class TestAsyncInteract:
         mock_agent = Mock()
         message = {"role": "user", "content": "test"}
         
-        with patch('llm_agents.frontend.cli.asyncio.to_thread') as mock_to_thread:
+        with patch('agentic_nav.frontend.cli.asyncio.to_thread') as mock_to_thread:
             mock_to_thread.return_value = None  # Successful completion
             
             await async_interact(mock_agent, message)
@@ -185,7 +185,7 @@ class TestAsyncInteract:
         mock_agent = Mock()
         message = {"role": "user", "content": "test"}
         
-        with patch('llm_agents.frontend.cli.asyncio.to_thread') as mock_to_thread:
+        with patch('agentic_nav.frontend.cli.asyncio.to_thread') as mock_to_thread:
             mock_to_thread.side_effect = KeyboardInterrupt()
             
             # Should handle KeyboardInterrupt gracefully
@@ -197,8 +197,8 @@ class TestAsyncInteract:
         mock_agent = Mock()
         message = {"role": "user", "content": "test"}
         
-        with patch('llm_agents.frontend.cli.asyncio.to_thread') as mock_to_thread:
-            with patch('llm_agents.frontend.cli.console') as mock_console:
+        with patch('agentic_nav.frontend.cli.asyncio.to_thread') as mock_to_thread:
+            with patch('agentic_nav.frontend.cli.console') as mock_console:
                 mock_to_thread.side_effect = Exception("Test error")
                 
                 await async_interact(mock_agent, message)
@@ -210,7 +210,7 @@ class TestAsyncInteract:
 class TestPrintWelcome:
     """Test the print_welcome function."""
 
-    @patch('llm_agents.frontend.cli.console')
+    @patch('agentic_nav.frontend.cli.console')
     def test_print_welcome(self, mock_console):
         """Test that welcome message is printed."""
         print_welcome()
@@ -229,10 +229,10 @@ class TestPrintWelcome:
 class TestMain:
     """Test the main CLI function."""
 
-    @patch('llm_agents.frontend.cli.setup_logging')
-    @patch('llm_agents.frontend.cli.NeurIPS2025Agent')
-    @patch('llm_agents.frontend.cli.create_prompt_session')
-    @patch('llm_agents.frontend.cli.print_welcome')
+    @patch('agentic_nav.frontend.cli.setup_logging')
+    @patch('agentic_nav.frontend.cli.NeurIPS2025Agent')
+    @patch('agentic_nav.frontend.cli.create_prompt_session')
+    @patch('agentic_nav.frontend.cli.print_welcome')
     def test_main_initialization(self, mock_welcome, mock_session, mock_agent_class, mock_setup_logging):
         """Test main function initialization."""
         # Mock agent instance
@@ -256,10 +256,10 @@ class TestMain:
         mock_agent_class.assert_called_once()
         mock_agent.setup_session.assert_called_once()
 
-    @patch('llm_agents.frontend.cli.setup_logging')
-    @patch('llm_agents.frontend.cli.NeurIPS2025Agent')
-    @patch('llm_agents.frontend.cli.create_prompt_session')
-    @patch('llm_agents.frontend.cli.print_welcome')
+    @patch('agentic_nav.frontend.cli.setup_logging')
+    @patch('agentic_nav.frontend.cli.NeurIPS2025Agent')
+    @patch('agentic_nav.frontend.cli.create_prompt_session')
+    @patch('agentic_nav.frontend.cli.print_welcome')
     def test_main_with_custom_params(self, mock_welcome, mock_session, mock_agent_class, mock_setup_logging):
         """Test main function with custom CLI parameters."""
         mock_agent = Mock()
@@ -289,11 +289,11 @@ class TestMain:
         assert llm_config['num_ctx'] == 65536
         assert tool_args['num_records'] == 20
 
-    @patch('llm_agents.frontend.cli.setup_logging')
-    @patch('llm_agents.frontend.cli.NeurIPS2025Agent')
-    @patch('llm_agents.frontend.cli.create_prompt_session')
-    @patch('llm_agents.frontend.cli.print_welcome')
-    @patch('llm_agents.frontend.cli.asyncio')
+    @patch('agentic_nav.frontend.cli.setup_logging')
+    @patch('agentic_nav.frontend.cli.NeurIPS2025Agent')
+    @patch('agentic_nav.frontend.cli.create_prompt_session')
+    @patch('agentic_nav.frontend.cli.print_welcome')
+    @patch('agentic_nav.frontend.cli.asyncio')
     def test_main_user_interaction(self, mock_asyncio, mock_welcome, mock_session, mock_agent_class, mock_setup_logging):
         """Test main function user interaction loop."""
         mock_agent = Mock()
@@ -315,10 +315,10 @@ class TestMain:
         # Verify asyncio.run was called for user interaction
         mock_asyncio.run.assert_called()
 
-    @patch('llm_agents.frontend.cli.setup_logging')
-    @patch('llm_agents.frontend.cli.NeurIPS2025Agent')
-    @patch('llm_agents.frontend.cli.create_prompt_session')
-    @patch('llm_agents.frontend.cli.print_welcome')
+    @patch('agentic_nav.frontend.cli.setup_logging')
+    @patch('agentic_nav.frontend.cli.NeurIPS2025Agent')
+    @patch('agentic_nav.frontend.cli.create_prompt_session')
+    @patch('agentic_nav.frontend.cli.print_welcome')
     def test_main_help_command(self, mock_welcome, mock_session, mock_agent_class, mock_setup_logging):
         """Test main function with help command."""
         mock_agent = Mock()
@@ -332,7 +332,7 @@ class TestMain:
         ]
         mock_session.return_value = mock_session_instance
         
-        with patch('llm_agents.frontend.cli.print_help') as mock_print_help:
+        with patch('agentic_nav.frontend.cli.print_help') as mock_print_help:
             from click.testing import CliRunner
             
             runner = CliRunner()
@@ -341,10 +341,10 @@ class TestMain:
             # Verify help was printed
             mock_print_help.assert_called_once()
 
-    @patch('llm_agents.frontend.cli.setup_logging')
-    @patch('llm_agents.frontend.cli.NeurIPS2025Agent')
-    @patch('llm_agents.frontend.cli.create_prompt_session')
-    @patch('llm_agents.frontend.cli.print_welcome')
+    @patch('agentic_nav.frontend.cli.setup_logging')
+    @patch('agentic_nav.frontend.cli.NeurIPS2025Agent')
+    @patch('agentic_nav.frontend.cli.create_prompt_session')
+    @patch('agentic_nav.frontend.cli.print_welcome')
     def test_main_exit_command(self, mock_welcome, mock_session, mock_agent_class, mock_setup_logging):
         """Test main function with exit command."""
         mock_agent = Mock()
@@ -362,3 +362,88 @@ class TestMain:
         
         # Should exit cleanly
         assert result.exit_code == 0
+
+
+class TestCommandProcessing:
+    """Test command processing in main loop."""
+
+    @patch('agentic_nav.frontend.cli.setup_logging')
+    @patch('agentic_nav.frontend.cli.NeurIPS2025Agent')
+    @patch('agentic_nav.frontend.cli.create_prompt_session')
+    @patch('agentic_nav.frontend.cli.print_welcome')
+    def test_save_command(self, mock_welcome, mock_session, mock_agent_class, mock_setup_logging):
+        """Test /save command."""
+        mock_agent = Mock()
+        mock_agent.get_history.return_value = [{"role": "user", "content": "test"}]
+        mock_agent_class.return_value = mock_agent
+
+        mock_session_instance = Mock()
+        mock_session_instance.prompt.side_effect = [
+            "/save test_history.json",
+            EOFError()
+        ]
+        mock_session.return_value = mock_session_instance
+
+        with patch('agentic_nav.frontend.cli.save_chat_history') as mock_save:
+            from click.testing import CliRunner
+
+            runner = CliRunner()
+            result = runner.invoke(main, [])
+
+            # Verify save was called
+            mock_save.assert_called_once()
+
+    @patch('agentic_nav.frontend.cli.setup_logging')
+    @patch('agentic_nav.frontend.cli.NeurIPS2025Agent')
+    @patch('agentic_nav.frontend.cli.create_prompt_session')
+    @patch('agentic_nav.frontend.cli.print_welcome')
+    def test_history_command(self, mock_welcome, mock_session, mock_agent_class, mock_setup_logging):
+        """Test /history command."""
+        mock_agent = Mock()
+        mock_agent.get_history.return_value = [
+            {"role": "user", "content": "test"}
+        ]
+        mock_agent_class.return_value = mock_agent
+
+        mock_session_instance = Mock()
+        mock_session_instance.prompt.side_effect = [
+            "/history",
+            EOFError()
+        ]
+        mock_session.return_value = mock_session_instance
+
+        with patch('agentic_nav.frontend.cli.show_history') as mock_show:
+            from click.testing import CliRunner
+
+            runner = CliRunner()
+            result = runner.invoke(main, [])
+
+            # Verify show_history was called
+            mock_show.assert_called_once()
+
+    @patch('agentic_nav.frontend.cli.setup_logging')
+    @patch('agentic_nav.frontend.cli.NeurIPS2025Agent')
+    @patch('agentic_nav.frontend.cli.create_prompt_session')
+    @patch('agentic_nav.frontend.cli.print_welcome')
+    def test_system_command(self, mock_welcome, mock_session, mock_agent_class, mock_setup_logging):
+        """Test /system command."""
+        mock_agent = Mock()
+        mock_agent.get_system_prompt.return_value = {"role": "system", "content": "Test prompt"}
+        mock_agent_class.return_value = mock_agent
+
+        mock_session_instance = Mock()
+        mock_session_instance.prompt.side_effect = [
+            "/system",
+            EOFError()
+        ]
+        mock_session.return_value = mock_session_instance
+
+        with patch('agentic_nav.frontend.cli.console') as mock_console:
+            from click.testing import CliRunner
+
+            runner = CliRunner()
+            result = runner.invoke(main, [])
+
+            # Verify console.print was called to show system prompt
+            assert mock_console.print.called
+
