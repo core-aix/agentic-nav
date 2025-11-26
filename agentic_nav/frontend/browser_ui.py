@@ -85,6 +85,7 @@ def chat_fn(
         config: Optional[Dict],
         messages: Optional[List[Dict]],
         agent: NeurIPS2025Agent,
+        width: int, 
 ) -> Tuple[List[Dict], Optional[List[Dict]]]:
     """
     Handle chat interaction using stateless agent.
@@ -120,6 +121,10 @@ def chat_fn(
     history.extend([user_msg_dict, assistant_msg_dict])
 
     try:
+        if width < 1200:
+            LOGGER.info("Detected small screen width, appending note to user message.")
+            new_message += "\n\n(Note: You are using a small screen device. Please format your responses accordingly to ensure readability. Please never use tables.)"
+
         # Create user message with timestamp
         user_message = {
             "role": "user",
@@ -129,6 +134,8 @@ def chat_fn(
 
         # Add user message to conversation
         messages.append(user_message)
+        history[-1]["content"] = "Working on it. Hang tight..."
+        yield history, messages
 
         # Stream the response
         accumulated_response = ""
@@ -287,9 +294,9 @@ def clear_chat(
     return [], reset_messages
 
 
-def submit_message(message, history, config, messages, agent):
+def submit_message(message, history, config, messages, agent, width):
     """Wrapper to clear input and process message"""
-    yield from chat_fn(message, history, config, messages, agent)
+    yield from chat_fn(message, history, config, messages, agent, width)
 
 
 def main():
@@ -306,7 +313,7 @@ def main():
             primary_hue=gr.themes.colors.slate,
             secondary_hue=gr.themes.colors.blue
         ),
-            css="""
+        css="""
             #submit_textbox button {
                 background-color: #ff6b6b !important;
                 border-color: #ff6b6b !important;
@@ -333,9 +340,9 @@ def main():
                 with gr.Row():
                     with gr.Column():
                         gr.Markdown("""
-                        <sub><sup>**Note:** This is an experimental deployment and LLMs can make mistakes. This can mean that the agent may not 
+                        **Note:** This is an experimental deployment and LLMs can make mistakes. This can mean that the agent may not 
                         discover your paper even though it is presented at the conference. Also, note that the ordering of authors may 
-                        not be correct. Check the paper links for more details.<sub><sup>
+                        not be correct. Check the paper links for more details.
                         """)
 
                         # Main chat interface
@@ -362,6 +369,13 @@ def main():
                                 # stop_btn=True TODO: Allow users to stop the conversation!
                             )
                             # submit_btn = gr.Button("Send", variant="primary", scale=1)
+
+                            # Hidden width input – value set from JS on submit
+                            width_box = gr.Number(
+                                visible=False,
+                                elem_id="width_box",
+                            )
+
 
                         with gr.Row():
                             clear_btn = gr.Button("🗑️ Clear Chat", size="sm")
@@ -510,10 +524,24 @@ def main():
             outputs=[config_state, init_status]
         )
 
+        def streaming_submit(msg_input, chatbot, config_state, messages_state, width):
+            # Immediately clear the input (first yield)
+            yield chatbot, messages_state, ""
+
+            # Then stream the real results
+            for new_chatbot, new_messages_state in submit_message(msg_input, chatbot, config_state, messages_state, agent, width):
+                yield new_chatbot, new_messages_state, ""
+
+
         msg_input.submit(
-            fn=lambda msg_input, chatbot, config_state, messages_state: (yield from submit_message(msg_input, chatbot, config_state, messages_state, agent)),
-            inputs=[msg_input, chatbot, config_state, messages_state],
-            outputs=[chatbot, messages_state]
+            fn=streaming_submit,  # lambda msg_input, chatbot, config_state, messages_state: (yield from submit_message(msg_input, chatbot, config_state, messages_state, agent)),
+            inputs=[msg_input, chatbot, config_state, messages_state, width_box],
+            outputs=[chatbot, messages_state, msg_input],
+            js="""
+                (msg_input, chatbot, config_state, messages_state, width_box) => {
+                    return [msg_input, chatbot, config_state, messages_state, window.innerWidth];
+                }
+                """,
         ).then(
             fn=lambda: "",
             inputs=None,
