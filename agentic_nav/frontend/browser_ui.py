@@ -19,7 +19,7 @@ import json
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict
 
-from agentic_nav.agents import NeurIPS2025Agent, DEFAULT_NEURIPS2025_AGENT_ARGS, AGENT_INTRODUCTION_PROMPT
+from agentic_nav.agents import NeurIPS2025Agent, DEFAULT_NEURIPS2025_AGENT_ARGS, AGENT_INTRODUCTION_PROMPT, SMALL_SCREEN_USER_PROMPT_ADDITIONAL_NOTE
 from agentic_nav.utils.logger import setup_logging
 from agentic_nav.utils.file_handlers import save_chat_history
 
@@ -123,7 +123,7 @@ def chat_fn(
     try:
         if width < 1200:
             LOGGER.info("Detected small screen width, appending note to user message.")
-            new_message += "\n\n(Note: You are using a small screen device. Please format your responses accordingly to ensure readability. Please never use tables.)"
+            new_message += "\n\n" + SMALL_SCREEN_USER_PROMPT_ADDITIONAL_NOTE
 
         # Create user message with timestamp
         user_message = {

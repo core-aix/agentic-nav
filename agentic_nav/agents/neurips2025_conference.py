@@ -56,13 +56,17 @@ AGENT_INTRODUCTION_PROMPT = {
     "content": f"""
     Welcome to AgenticNAV!
     I am happy to assist you navigating NeurIPS 2025. You can ask things like: 
-        - "Please show me paper on LLM request routing"
-        - "Please build a schedule for me to visit posters on federated learning on Tuesday afternoon"
+        - "Please show me papers on LLM request routing"
+        - "Please build a schedule for me to visit posters on federated learning on December 3 afternoon"
     
     Feel free to start anytime you are ready! 
     """
 }
 
+SMALL_SCREEN_USER_PROMPT_ADDITIONAL_NOTE = "(Note: You are using a small screen device. " \
+    "Please format your responses accordingly to ensure readability. " \
+    "Please never use tables. " \
+    "Follow the other system instructions carefully except that you should not use tables, especially make sure to include the required links.)"
 
 
 @dataclass
