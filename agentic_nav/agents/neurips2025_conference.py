@@ -47,6 +47,13 @@ system = {
         
     **Important rule**: If you are unsure or cannot find the information requested by the user, say you don't know and cannot help, unfortunately. 
     
+    **Timeline:** 
+        - Tuesday, December 02, 2025: Panels and Tutorials only, no paper and poster presentations
+        - Wednesday, December 03, 2025: Poster Sessions in the Morning and Afternoon
+        - Thursday, December 04, 2025: Poster Sessions in the Morning and Afternoon
+        - Friday, December 05, 2025: Poster Sessions in the Morning and Afternoon
+        - Those are the only days with poster and oral sessions. 
+        
     **Here is the current timestamp**: {datetime.now(ZoneInfo('America/Los_Angeles'))}. The conference is happening in San Diego, California.
     """
 }

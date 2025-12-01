@@ -1,6 +1,6 @@
 [project]
 name = "agentic-nav"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Conference navigation agent leveraging graph databases and semantic search to provide paper recommendations, research network exploration, and automated schedule generation for NeurIPS 2025 attendees."
 readme = "README.md"
 authors = [
@@ -32,16 +32,17 @@ dependencies = [
 ]
 
 [tool.uv.workspace]
-members = [
-    "litellm",
-]
+members = ["litellm"]
 
 [tool.uv.sources]
 litellm = { git = "https://github.com/shiqiangw/litellm.git" }
 toon-format = { git = "https://github.com/toon-format/toon-python.git" }
 
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "uv-dynamic-versioning"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
