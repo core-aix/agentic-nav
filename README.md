@@ -11,6 +11,9 @@ going on.
 The agent can also support you in planning your next conference trip by providing a schedule around one or more topics 
 that you are interested in.
 
+## Quickstart 
+We are hosting AgenticNAV on HuggingFace Spaces. Check it out here: https://huggingface.co/spaces/CORE-AIx/AgenticNav.
+
 ## Installation & usage of the web-based interface
 The agent is conveniently packaged as a docker image. You can spin up the entire system by using the commands below. 
 Make sure to have the [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#installation) installed.
@@ -185,8 +188,9 @@ for debugging. To set the right debugging level for your application, you can us
 By default, it is set to `INFO`.
 
 #### Running tests
-We try to cover all tools and agent functionalities in thorough unit tests. 
-You can run them via: 
+We try to cover all tools and agent functionalities in thorough unit tests. Our test coverage currently sits at ~65% 
+with all agent core functionalities and tools covered. We currently do not test against Ollama or Neo4j integrations.
+You can run the tests via: 
 ```commandline
-uv run pytest tests/
+uv run pytest --cov=agentic_nav
 ```
