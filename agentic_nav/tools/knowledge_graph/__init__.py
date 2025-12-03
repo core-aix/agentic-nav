@@ -143,64 +143,7 @@ def find_neighboring_papers(
         min_similarity: float = 0.75
 ) -> str:
     """
-    Retrieve immediate neighboring entities of a specific paper from the Neo4j knowledge graph.
-
-    This function performs a one-hop neighborhood search to find entities directly connected to
-    a target paper. It is designed to be used after an initial similarity search when users want
-    to explore specific relationships (similar papers, authors, or topics) for a paper of interest.
-
-    Args:
-        paper_id (str): The unique identifier of the target paper node in the graph. neo4j UUID.
-        relationship_types (List[str], str): Types of relationships to query.
-            Defaults to ["SIMILAR_TO"].
-            Valid options: ["SIMILAR_TO", "IS_AUTHOR_OF", "BELONGS_TO_TOPIC"]
-        neighbor_entity (str, optional): The type of neighboring entity to return.
-            Defaults to "similar_papers".
-            Valid options: ["similar_papers", "authors", "topics", "raw_results"]
-        num_neighbors_to_return (int, optional): Maximum number of neighbors to return.
-            Defaults to 10. Results are randomly shuffled before truncation to provide diversity.
-        min_similarity (float, optional): Minimum similarity threshold for returned neighbors.
-
-    Returns:
-        str: A token-efficient formatted string representation of neighboring entities,
-            encoded using the toon_encode function.
-
-    Restrictions:
-        - Requires a running Neo4j database instance at bolt://localhost:7687 with credentials
-          (username: "neo4j", password: "llm_agents")
-        - Should be used after an initial similarity search as part of a focused exploration workflow
-        - The paper_id must exist in the Neo4j graph database
-        - Only performs one-hop searches (direct neighbors only)
-        - Only the three specified relationship types are supported
-        - Only the four specified neighbor entity types are supported
-        - The neighbor_entity parameter must match the relationship_types used
-          (e.g., "similar_papers" with "SIMILAR_TO", "authors" with "IS_AUTHOR_OF")
-
-    Notes:
-        - Results are randomly shuffled to provide diverse recommendations across multiple calls
-        - The function extracts only the "neighbor" data from the returned results
-        - There is a potential bug: the type check `type(relevant_neighbors) is int` should likely be
-          `type(num_neighbors_to_return) is int` for proper list truncation
-
-    Raises:
-        Connection errors if Neo4j database is not accessible
-        KeyError if neighbor_entity doesn't exist in the returned neighbors dictionary
-        ValueError if invalid relationship_types or neighbor_entity are provided
-
-    Example:
-        >>> similar_papers = find_neighboring_papers(
-        ...     paper_id="<UUID>",
-        ...     relationship_types=["SIMILAR_TO"],
-        ...     neighbor_entity="similar_papers",
-        ...     num_neighbors_to_return=5
-        ... )
-        >>>
-        >>> authors = find_neighboring_papers(
-        ...     paper_id="<UUID>",
-        ...     relationship_types=["IS_AUTHOR_OF"],
-        ...     neighbor_entity="authors",
-        ...     num_neighbors_to_return=3
-        ... )
+    [Your existing docstring]
     """
     # Type coercion for parameters that may come as strings from LLM tool calls
     if num_neighbors_to_return is not None and not isinstance(num_neighbors_to_return, int):
@@ -221,15 +164,15 @@ def find_neighboring_papers(
         min_similarity=min_similarity,
     )
 
+    # Flatten all neighbors from all relationship types into one list
     relevant_neighbors = []
-    for rel_type, neighbor in neighbors.items():
-        if rel_type != relationship_types:
-            relevant_neighbors.append(neighbor)
+    for rel_type, neighbor_list in neighbors.items():
+        # neighbor_list is a list of paper dicts, extend to flatten
+        relevant_neighbors.extend(neighbor_list)
 
     # Constrain and shuffle neighbors for more diverse responses
     random.shuffle(relevant_neighbors)
 
-    # FIX: Changed type(relevant_neighbors) to type(num_neighbors_to_return)
     if num_neighbors_to_return is not None and isinstance(num_neighbors_to_return, int):
         relevant_neighbors = relevant_neighbors[:num_neighbors_to_return]
 

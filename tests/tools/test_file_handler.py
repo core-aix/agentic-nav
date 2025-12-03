@@ -12,7 +12,7 @@ from agentic_nav.tools.knowledge_graph.file_handler import save_graph, load_grap
 class TestSaveGraph:
     """Test the save_graph function."""
 
-    def test_save_graph_basic(self, capsys):
+    def test_save_graph_basic(self):
         """Test basic graph saving functionality."""
         # Create a simple graph
         graph = nx.Graph()
@@ -29,10 +29,6 @@ class TestSaveGraph:
             # Verify file was created
             assert output_path.exists()
             assert output_path.is_file()
-
-            # Verify output message
-            captured = capsys.readouterr()
-            assert f"Graph saved to {output_path}" in captured.out
 
     def test_save_graph_with_complex_attributes(self):
         """Test saving graph with complex node and edge attributes."""
@@ -72,7 +68,7 @@ class TestSaveGraph:
 class TestLoadGraph:
     """Test the load_graph function."""
 
-    def test_load_graph_basic(self, capsys):
+    def test_load_graph_basic(self):
         """Test basic graph loading functionality."""
         # Create and save a graph
         original_graph = nx.Graph()
@@ -96,10 +92,6 @@ class TestLoadGraph:
             assert loaded_graph.nodes["paper1"]["title"] == "Test Paper 1"
             assert loaded_graph.has_edge("paper1", "paper2")
             assert loaded_graph["paper1"]["paper2"]["weight"] == 0.85
-
-            # Verify output message
-            captured = capsys.readouterr()
-            assert f"Graph loaded from {file_path}" in captured.out
 
     def test_load_graph_with_complex_attributes(self):
         """Test loading graph with complex attributes."""

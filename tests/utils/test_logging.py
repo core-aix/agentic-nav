@@ -35,24 +35,23 @@ class TestSetupLogging:
 
     @patch('agentic_nav.utils.logger.datetime')
     def test_setup_logging_creates_handlers(self, mock_datetime):
-        """Test that console and file handlers are created."""
+        """Test that console handler is created (file handler is disabled)."""
         mock_datetime.now.return_value.strftime.return_value = "2024-01-01_12-00"
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Clear any existing handlers
             root_logger = logging.getLogger()
             for handler in root_logger.handlers[:]:
                 root_logger.removeHandler(handler)
-            
+
             setup_logging(log_dir=temp_dir, level="DEBUG")
-            
-            # Check that handlers were added
-            assert len(root_logger.handlers) == 2
-            
+
+            # Check that only console handler was added (file handler is commented out)
+            assert len(root_logger.handlers) == 1
+
             # Check handler types
             handler_types = [type(h).__name__ for h in root_logger.handlers]
             assert "StreamHandler" in handler_types
-            assert "RotatingFileHandler" in handler_types
 
     def test_setup_logging_sets_log_levels(self):
         """Test that log levels are set correctly."""
@@ -79,43 +78,36 @@ class TestSetupLogging:
 
     @patch('agentic_nav.utils.logger.datetime')
     def test_setup_logging_file_naming(self, mock_datetime):
-        """Test that log files are named correctly."""
+        """Test that log files are named correctly (currently file handler is disabled)."""
         mock_datetime.now.return_value.strftime.return_value = "2024-01-01_12-30"
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             setup_logging(log_dir=temp_dir, level="INFO")
-            
-            # Check that log file was created with correct name
+
+            # File handler is currently commented out, so no log files are created
             log_files = list(Path(temp_dir).glob("*.log"))
-            assert len(log_files) == 1
-            assert log_files[0].name == "2024-01-01_12-30_llm_agents.log"
+            assert len(log_files) == 0
 
     def test_setup_logging_handler_levels(self):
-        """Test that handlers have correct log levels."""
+        """Test that console handler has correct log level (file handler is disabled)."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root_logger = logging.getLogger()
             # Clear existing handlers
             for handler in root_logger.handlers[:]:
                 root_logger.removeHandler(handler)
-                
+
             setup_logging(log_dir=temp_dir, level="DEBUG")
-            
-            # Find console and file handlers
+
+            # Find console handler
             console_handler = None
-            file_handler = None
-            
+
             for handler in root_logger.handlers:
-                if isinstance(handler, logging.StreamHandler) and not hasattr(handler, 'baseFilename'):
+                if isinstance(handler, logging.StreamHandler):
                     console_handler = handler
-                elif hasattr(handler, 'baseFilename'):
-                    file_handler = handler
-            
-            # Verify handler levels
+
+            # Verify console handler level
             assert console_handler is not None
             assert console_handler.level == logging.WARNING
-            
-            assert file_handler is not None
-            assert file_handler.level == logging.DEBUG
 
     def test_setup_logging_formatters(self):
         """Test that formatters are set correctly."""
@@ -141,20 +133,15 @@ class TestSetupLogging:
 
     @patch('agentic_nav.utils.logger.logging.handlers.RotatingFileHandler')
     def test_setup_logging_rotating_file_config(self, mock_rotating_handler):
-        """Test that rotating file handler is configured correctly."""
+        """Test that rotating file handler is not created (currently disabled)."""
         mock_handler_instance = Mock()
         mock_rotating_handler.return_value = mock_handler_instance
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             setup_logging(log_dir=temp_dir, level="INFO")
-            
-            # Verify RotatingFileHandler was created with correct parameters
-            mock_rotating_handler.assert_called_once()
-            call_args = mock_rotating_handler.call_args
-            
-            # Check maxBytes and backupCount parameters
-            assert call_args.kwargs['maxBytes'] == 10 * 1024 * 1024  # 10MB
-            assert call_args.kwargs['backupCount'] == 5
+
+            # RotatingFileHandler creation is commented out, so it should not be called
+            mock_rotating_handler.assert_not_called()
 
     def test_setup_logging_default_parameters(self):
         """Test function with default parameters."""

@@ -34,16 +34,16 @@ def setup_logging(log_dir: str = "logs", level: str = "INFO", console_level: str
     # File handler - for production
     time_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
 
-    file_handler = logging.handlers.RotatingFileHandler(
-        f"{log_dir}/{time_now}_llm_agents.log",
-        maxBytes=10 * 1024 * 1024,  # 10MB
-        backupCount=5
-    )
-    file_handler.setLevel(logging.DEBUG)
-    file_format = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
-    )
-    file_handler.setFormatter(file_format)
+    # file_handler = logging.handlers.RotatingFileHandler(
+    #     f"{log_dir}/{time_now}_llm_agents.log",
+    #     maxBytes=10 * 1024 * 1024,  # 10MB
+    #     backupCount=5
+    # )
+    # file_handler.setLevel(logging.DEBUG)
+    # file_format = logging.Formatter(
+    #     "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
+    # )
+    # file_handler.setFormatter(file_format)
 
     root_logger.addHandler(console_handler)
-    root_logger.addHandler(file_handler)
+    # root_logger.addHandler(file_handler)

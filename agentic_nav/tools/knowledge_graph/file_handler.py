@@ -1,3 +1,4 @@
+import logging
 import pickle
 import networkx as nx
 
@@ -12,7 +13,7 @@ def save_graph(graph: nx.Graph, output_path: str):
     with open(output_path, 'wb') as f:
         pickle.dump(graph, f)
         f.close()
-    print(f"Graph saved to {output_path}")
+    logging.info(f"Graph saved to {output_path}")
 
 
 def load_graph(input_path: str) -> nx.Graph:
@@ -25,5 +26,5 @@ def load_graph(input_path: str) -> nx.Graph:
     with open(input_path, 'rb') as f:
         graph = pickle.load(f)
         f.close()
-    print(f"Graph loaded from {input_path}")
+    logging.info(f"Graph loaded from {input_path}")
     return graph

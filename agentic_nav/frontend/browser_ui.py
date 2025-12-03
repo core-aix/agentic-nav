@@ -329,6 +329,9 @@ def main():
         # 🤖 AgenticNAV - Planning your NeurIPS 2025 visit made effortless
         This agent can help you explore the more than 5000 papers at this year's NeurIPS conference. 
         You can start chatting right away but we also offer options for customization (see tab "Guide & Settings").
+        
+        **Note on Usability:** HuggingFace ZeroGPU quotas for users that are not logged in are very restrictive. 
+        This is out of our control and may limit the utility of AgenticNAV.
         """)
 
         # Session state for agent instance, config, and messages
